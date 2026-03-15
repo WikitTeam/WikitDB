@@ -10,9 +10,9 @@ const PageDetail = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [activeTab, setActiveTab] = useState('讨论');
+    const [activeTab, setActiveTab] = useState('正文');
 
-    const tabs = ['正文', '源码', '信息', '历史', '讨论'];
+    const tabs = ['正文', '源码', '信息', '历史'];
 
     const fetchPageData = async () => {
         if (!site || !url) return;
@@ -207,15 +207,6 @@ const PageDetail = () => {
                             <div 
                                 className="prose prose-invert max-w-none text-sm prose-table:w-full prose-th:text-left prose-td:border-t prose-td:border-gray-700 prose-th:p-2 prose-td:p-2 prose-td:whitespace-nowrap break-normal"
                                 dangerouslySetInnerHTML={{ __html: data.historyHtml }}
-                            />
-                        </div>
-                    )}
-
-                    {activeTab === '讨论' && (
-                        <div className="bg-gray-900/50 p-4 rounded-lg overflow-x-auto border border-gray-700">
-                            <div 
-                                className="prose prose-invert max-w-none text-sm break-words"
-                                dangerouslySetInnerHTML={{ __html: data.discussionHtml }}
                             />
                         </div>
                     )}
