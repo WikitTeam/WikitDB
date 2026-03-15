@@ -8,20 +8,22 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: '缺少有效的 site 或 url 参数' });
     }
 
+    // 核心修复：强行清理脏 URL，砍掉可能导致 404 的 Wikidot 语法残留和锚点
+    const cleanUrl = url.split('|')[0].split('#')[0].trim();
+
     const wikiConfig = config.SUPPORT_WIKI.find(w => w.PARAM === site);
     if (!wikiConfig) {
         return res.status(404).json({ error: '未找到该站点配置' });
     }
 
     try {
-        // 核心修复 1：主请求头绝对不能带伪造的 Cookie，否则 Wikidot 会全站报 404
         const fetchHeaders = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
         };
 
-        const response = await fetch(url, { headers: fetchHeaders });
+        const response = await fetch(cleanUrl, { headers: fetchHeaders });
         
         if (response.status === 404) {
             throw new Error(`404: 原站点中该页面不存在 (可能是死链或已被原作者删除)`);
@@ -41,7 +43,7 @@ export default async function handler(req, res) {
             }
         }
         if (!title || title.startsWith('http')) {
-            const urlParts = url.split('/');
+            const urlParts = cleanUrl.split('/');
             title = decodeURIComponent(urlParts[urlParts.length - 1] || '未命名页面').replace(/-/g, ' ');
         }
 
@@ -67,14 +69,13 @@ export default async function handler(req, res) {
         let discussionHtml = '<div class="text-gray-500 text-center">该页面暂无讨论数据。</div>';
 
         if (pageId) {
-            const origin = new URL(url).origin;
+            const origin = new URL(cleanUrl).origin;
             const ajaxUrl = `${origin}/ajax-module-connector.php`;
             
-            // 核心修复 2：AJAX 专用请求头，必须带伪造的 Cookie 和 Referer 才能拿到源码历史
             const ajaxHeaders = {
                 ...fetchHeaders,
                 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Referer': url,
+                'Referer': cleanUrl,
                 'Cookie': 'wikidot_token7=123456;'
             };
 
@@ -137,7 +138,7 @@ export default async function handler(req, res) {
         res.status(200).json({
             siteName: wikiConfig.NAME,
             siteImg: wikiConfig.ImgURL,
-            originalUrl: url,
+            originalUrl: cleanUrl,
             title: title,
             content: contentHtml,
             tags: tags,
