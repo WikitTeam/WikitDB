@@ -59,7 +59,9 @@ export default async function handler(req, res) {
         });
 
         let creator = $('.printuser').last().text().trim() || $('#page-info a[href*="/user:info/"]').first().text().trim() || '未知';
-        let lastUpdated = $('.odate').text().trim() || '未知';
+        
+        // 核心修复：使用 .last() 强制只获取最后一个时间节点，防止多个日期拼接
+        let lastUpdated = $('#page-info .odate').last().text().trim() || $('.odate').last().text().trim() || '未知';
 
         let pageId = null;
         const idMatch = html.match(/pageId\s*[:=]\s*['"]?(\d+)['"]?/i) || html.match(/page_id\s*[:=]\s*['"]?(\d+)['"]?/i);
@@ -106,10 +108,8 @@ export default async function handler(req, res) {
                         const $src = cheerio.load(data.body);
                         let rawHtml = $src('.page-source').html() || data.body;
                         
-                        // 将所有的 <br> 或 <br/> 还原为换行符
                         rawHtml = rawHtml.replace(/<br\s*\/?>/gi, '\n');
                         
-                        // 还原转义字符，并用 trim() 彻底清除开头的多余空格和换行
                         sourceCode = rawHtml.replace(/&lt;/g, '<')
                                             .replace(/&gt;/g, '>')
                                             .replace(/&amp;/g, '&')
