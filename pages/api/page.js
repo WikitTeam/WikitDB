@@ -8,9 +8,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: '缺少有效的 site 或 url 参数' });
     }
 
-    // 清理脏后缀
     const cleanUrl = url.split('|')[0].split('#')[0].trim();
-    // 强制转换为 https，防止 POST 请求因原站重定向而丢失 Token 和 Body
     const secureUrl = cleanUrl.replace(/^http:\/\//i, 'https://');
 
     const wikiConfig = config.SUPPORT_WIKI.find(w => w.PARAM === site);
@@ -107,7 +105,16 @@ export default async function handler(req, res) {
                     if (data.status === 'ok') {
                         const $src = cheerio.load(data.body);
                         let rawHtml = $src('.page-source').html() || data.body;
-                        sourceCode = rawHtml.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                        
+                        // 将所有的 <br> 或 <br/> 还原为换行符
+                        rawHtml = rawHtml.replace(/<br\s*\/?>/gi, '\n');
+                        
+                        // 还原转义字符，并用 trim() 彻底清除开头的多余空格和换行
+                        sourceCode = rawHtml.replace(/&lt;/g, '<')
+                                            .replace(/&gt;/g, '>')
+                                            .replace(/&amp;/g, '&')
+                                            .replace(/&quot;/g, '"')
+                                            .trim();
                     } else {
                         sourceCode = `请求源码失败，原站返回: ${data.status}`;
                     }
