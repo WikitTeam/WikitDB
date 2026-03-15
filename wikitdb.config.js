@@ -1,6 +1,3 @@
-// wikitdb.config.js
-const { FLIGHT_PARAMETERS } = require("next/dist/client/components/app-router-headers");
-
 module.exports = {
     SITE_NAME: 'WikitDB',
     SITE_URL: '',
