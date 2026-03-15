@@ -10,7 +10,7 @@ const PageDetail = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [activeTab, setActiveTab] = useState('正文');
+    const [activeTab, setActiveTab] = useState('源码');
 
     const tabs = ['正文', '源码', '信息', '历史', '讨论'];
 
@@ -168,7 +168,7 @@ const PageDetail = () => {
                     {activeTab === '源码' && (
                         <div className="bg-gray-900 p-4 rounded-lg overflow-x-auto border border-gray-700">
                             <pre className="text-gray-300 text-sm whitespace-pre-wrap font-mono break-all">
-                                {data.content}
+                                {data.sourceCode}
                             </pre>
                         </div>
                     )}
@@ -203,19 +203,19 @@ const PageDetail = () => {
                     )}
 
                     {activeTab === '历史' && (
-                        <div className="text-center py-16 border border-dashed border-gray-700 rounded-lg bg-gray-900/20">
-                            <div className="text-gray-300 mb-2 font-medium">历史记录数据为空</div>
-                            <div className="text-sm text-gray-500 max-w-lg mx-auto">
-                                此页面的修改历史由 Wikidot 动态生成。目前的单页 API 仅抓取了静态 DOM 结构，没有向原站发起 `PageHistoryModule` 的 AJAX 模拟请求。
-                            </div>
+                        <div className="bg-gray-900/50 p-4 rounded-lg overflow-x-auto border border-gray-700">
+                            <div 
+                                className="prose prose-invert max-w-none text-sm prose-table:w-full prose-th:text-left prose-td:border-t prose-td:border-gray-700 prose-th:p-2 prose-td:p-2 prose-td:whitespace-nowrap break-normal"
+                                dangerouslySetInnerHTML={{ __html: data.historyHtml }}
+                            />
                         </div>
                     )}
 
                     {activeTab === '讨论' && (
                         <div className="text-center py-16 border border-dashed border-gray-700 rounded-lg bg-gray-900/20">
-                            <div className="text-gray-300 mb-2 font-medium">讨论区数据为空</div>
+                            <div className="text-gray-300 mb-2 font-medium">讨论区暂未接入</div>
                             <div className="text-sm text-gray-500 max-w-lg mx-auto">
-                                论坛评论数据不包含在初始源码中。如果要接入讨论区，需要解析当前页面的 thread ID 并专门构建针对 `ForumViewThreadCommentsModule` 的请求。
+                                论坛评论数据需要解析 thread ID 并构建 ForumViewThreadCommentsModule 的请求。如果你还需要这个，随时告诉我。
                             </div>
                         </div>
                     )}
