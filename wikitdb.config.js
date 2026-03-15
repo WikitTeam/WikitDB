@@ -18,6 +18,12 @@ module.exports = {
             PARAM: "dfc"
         },
         {
+            NAME: "If-backrooms",
+            URL: "https://if-backrooms.wikidot.com/",
+            ImgURL: "https://laimu.backroomswiki.top/img/Logo.png",
+            PARAM: "dfc"
+        },
+        {
             NAME: "地下黑市",
             URL: "https://ubmh.wikidot.com/",
             ImgURL: "https://ubmh.wdfiles.com/local--files/admin%3Atheme/ubmh.webp",
