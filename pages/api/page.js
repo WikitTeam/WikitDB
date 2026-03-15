@@ -21,6 +21,11 @@ export default async function handler(req, res) {
         };
 
         const response = await fetch(url, { headers: fetchHeaders });
+        
+        // 专门拦截 404 死链，防止整个详情页崩溃白屏
+        if (response.status === 404) {
+            throw new Error(`404: 原站点中该页面不存在 (可能是死链或已被原作者删除)`);
+        }
         if (!response.ok) {
             throw new Error(`HTTP 状态码异常: ${response.status}`);
         }
@@ -28,7 +33,6 @@ export default async function handler(req, res) {
         const html = await response.text();
         const $ = cheerio.load(html);
 
-        // 1. 标题修复：绝对禁止退化为完整 URL
         let title = $('#page-title').text().trim();
         if (!title) {
             title = $('title').text().trim();
@@ -37,7 +41,6 @@ export default async function handler(req, res) {
             }
         }
         if (!title || title.startsWith('http')) {
-            // 如果只有 URL，强制截取最后一段解码为中文标题，而不是显示一长串网址
             const urlParts = url.split('/');
             title = decodeURIComponent(urlParts[urlParts.length - 1] || '未命名页面').replace(/-/g, ' ');
         }
@@ -53,7 +56,6 @@ export default async function handler(req, res) {
         let creator = $('.printuser').last().text().trim() || $('#page-info a[href*="/user:info/"]').first().text().trim() || '未知';
         let lastUpdated = $('.odate').text().trim() || '未知';
 
-        // 2. 暴力提取 pageId：涵盖所有已知写法
         let pageId = null;
         const idMatch = html.match(/pageId\s*[:=]\s*['"]?(\d+)['"]?/i) || html.match(/page_id\s*[:=]\s*['"]?(\d+)['"]?/i);
         if (idMatch && idMatch[1]) {
@@ -67,12 +69,14 @@ export default async function handler(req, res) {
         if (pageId) {
             const origin = new URL(url).origin;
             const ajaxUrl = `${origin}/ajax-module-connector.php`;
+            
+            // 核心修复点：增加了 Referer，模拟真实的同源请求，解决 not_ok 报错
             const ajaxHeaders = {
                 ...fetchHeaders,
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Referer': url 
             };
 
-            // 3. 并发抓取三大底层模块
             const [srcRes, histRes, discRes] = await Promise.allSettled([
                 fetch(ajaxUrl, {
                     method: 'POST',
@@ -97,7 +101,6 @@ export default async function handler(req, res) {
                 })()
             ]);
 
-            // 解析源码 (避免 HTML 标签被 cheerio 误删)
             if (srcRes.status === 'fulfilled' && srcRes.value.ok) {
                 try {
                     const data = await srcRes.value.json();
@@ -105,23 +108,27 @@ export default async function handler(req, res) {
                         const $src = cheerio.load(data.body);
                         let rawHtml = $src('.page-source').html() || data.body;
                         sourceCode = rawHtml.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+                    } else {
+                        sourceCode = `请求源码失败，原站返回: ${data.status}`;
                     }
                 } catch(e) {}
             }
 
-            // 解析历史
             if (histRes.status === 'fulfilled' && histRes.value.ok) {
                 try {
                     const data = await histRes.value.json();
-                    if (data.status === 'ok') historyHtml = data.body;
+                    if (data.status === 'ok') {
+                        historyHtml = data.body;
+                    }
                 } catch(e) {}
             }
 
-            // 解析讨论
             if (discRes.status === 'fulfilled' && discRes.value.ok) {
                 try {
                     const data = await discRes.value.json();
-                    if (data.status === 'ok') discussionHtml = data.body;
+                    if (data.status === 'ok') {
+                        discussionHtml = data.body;
+                    }
                 } catch(e) {}
             }
         }
