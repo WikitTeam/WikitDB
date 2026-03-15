@@ -15,11 +15,12 @@ const Pages = () => {
         setData(null);
         
         try {
-            const res = await fetch(`/api/crawler?site=${siteParam}`);
+            const apiUrl = `${window.location.origin}/api/crawler?site=${siteParam}`;
+            const res = await fetch(apiUrl);
             const result = await res.json();
             
             if (!res.ok) {
-                throw new Error(result.error || '请求失败');
+                throw new Error(result.details || result.error || '请求失败');
             }
             
             setData(result);
