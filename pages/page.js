@@ -215,7 +215,7 @@ const PageDetail = () => {
                         <div className="text-center py-16 border border-dashed border-gray-700 rounded-lg bg-gray-900/20">
                             <div className="text-gray-300 mb-2 font-medium">讨论区暂未接入</div>
                             <div className="text-sm text-gray-500 max-w-lg mx-auto">
-                                论坛评论数据需要解析 thread ID 并构建 ForumViewThreadCommentsModule 的请求。如果你还需要这个，随时告诉我。
+                                铸币 看什么呢
                             </div>
                         </div>
                     )}
