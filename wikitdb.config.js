@@ -21,7 +21,7 @@ module.exports = {
             NAME: "If-backrooms",
             URL: "https://if-backrooms.wikidot.com/",
             ImgURL: "https://laimu.backroomswiki.top/img/Logo.png",
-            PARAM: "dfc"
+            PARAM: "if"
         },
         {
             NAME: "地下黑市",
