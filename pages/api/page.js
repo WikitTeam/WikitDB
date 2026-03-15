@@ -8,7 +8,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: '缺少有效的 site 或 url 参数' });
     }
 
-    // 核心修复：强行清理脏 URL，砍掉可能导致 404 的 Wikidot 语法残留和锚点
     const cleanUrl = url.split('|')[0].split('#')[0].trim();
 
     const wikiConfig = config.SUPPORT_WIKI.find(w => w.PARAM === site);
@@ -66,7 +65,6 @@ export default async function handler(req, res) {
 
         let sourceCode = '源码抓取失败：未能在原站网页中解析到 pageId。';
         let historyHtml = '<div class="text-gray-500">历史记录抓取失败：未能在原站网页中解析到 pageId。</div>';
-        let discussionHtml = '<div class="text-gray-500 text-center">该页面暂无讨论数据。</div>';
 
         if (pageId) {
             const origin = new URL(cleanUrl).origin;
@@ -79,7 +77,7 @@ export default async function handler(req, res) {
                 'Cookie': 'wikidot_token7=123456;'
             };
 
-            const [srcRes, histRes, discRes] = await Promise.allSettled([
+            const [srcRes, histRes] = await Promise.allSettled([
                 fetch(ajaxUrl, {
                     method: 'POST',
                     headers: ajaxHeaders,
@@ -89,18 +87,7 @@ export default async function handler(req, res) {
                     method: 'POST',
                     headers: ajaxHeaders,
                     body: `page_id=${pageId}&moduleName=history/PageRevisionListModule&page=1&perpage=50&wikidot_token7=123456`
-                }),
-                (async () => {
-                    let threadId = null;
-                    const tMatch = html.match(/\/forum\/t-(\d+)/);
-                    if (tMatch) threadId = tMatch[1];
-                    if (!threadId) throw new Error('No thread ID');
-                    return fetch(ajaxUrl, {
-                        method: 'POST',
-                        headers: ajaxHeaders,
-                        body: `t=${threadId}&moduleName=forum/ForumViewThreadCommentsModule&pageNo=1&wikidot_token7=123456`
-                    });
-                })()
+                })
             ]);
 
             if (srcRes.status === 'fulfilled' && srcRes.value.ok) {
@@ -124,15 +111,6 @@ export default async function handler(req, res) {
                     }
                 } catch(e) {}
             }
-
-            if (discRes.status === 'fulfilled' && discRes.value.ok) {
-                try {
-                    const data = await discRes.value.json();
-                    if (data.status === 'ok') {
-                        discussionHtml = data.body;
-                    }
-                } catch(e) {}
-            }
         }
 
         res.status(200).json({
@@ -145,8 +123,7 @@ export default async function handler(req, res) {
             creator: creator,
             lastUpdated: lastUpdated,
             sourceCode: sourceCode,
-            historyHtml: historyHtml,
-            discussionHtml: discussionHtml
+            historyHtml: historyHtml
         });
     } catch (error) {
         res.status(500).json({ error: '详情页抓取失败', details: error.message });
