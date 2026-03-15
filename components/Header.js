@@ -1,4 +1,3 @@
-// components/Header.js
 const config = require('../wikitdb.config.js');
 
 const Header = () => {
