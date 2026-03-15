@@ -92,11 +92,22 @@ const PageDetail = () => {
                                 <div className="flex flex-wrap gap-x-6 gap-y-2">
                                     <div className="flex items-center gap-2">
                                         <span className="text-gray-500">创建者:</span>
-                                        <span className="text-indigo-400">{data.creator}</span>
+                                        <div className="flex items-center text-indigo-400">
+                                            {data.creatorAvatar && (
+                                                <img src={data.creatorAvatar} alt="avatar" className="w-4 h-4 rounded-full mr-1.5 object-cover" />
+                                            )}
+                                            {data.creatorName}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-gray-500">原网页最后更新:</span>
                                         <span>{data.lastUpdated}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-gray-500">页面评分:</span>
+                                        <span className={`font-medium ${data.rating.includes('+') ? 'text-green-400' : data.rating.includes('-') ? 'text-red-400' : 'text-gray-300'}`}>
+                                            {data.rating}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -186,7 +197,12 @@ const PageDetail = () => {
                                 </div>
                                 <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
                                     <div className="text-gray-500 text-sm mb-1">创建者 / 搬运者</div>
-                                    <div>{data.creator}</div>
+                                    <div className="flex items-center">
+                                        {data.creatorAvatar && (
+                                            <img src={data.creatorAvatar} alt="avatar" className="w-5 h-5 rounded-full mr-2 object-cover" />
+                                        )}
+                                        {data.creatorName}
+                                    </div>
                                 </div>
                                 <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
                                     <div className="text-gray-500 text-sm mb-1">原站最后更新时间</div>
@@ -205,7 +221,7 @@ const PageDetail = () => {
                     {activeTab === '历史' && (
                         <div className="bg-gray-900/50 p-4 rounded-lg overflow-x-auto border border-gray-700">
                             <div 
-                                className="prose prose-invert max-w-none text-sm prose-table:w-full prose-th:text-left prose-td:border-t prose-td:border-gray-700 prose-th:p-2 prose-td:p-2 prose-td:whitespace-nowrap break-normal"
+                                className="prose prose-invert max-w-none text-sm prose-table:w-full prose-th:text-left prose-td:border-t prose-td:border-gray-700 prose-th:p-2 prose-td:p-2 prose-td:whitespace-nowrap break-normal prose-img:inline-block prose-img:w-5 prose-img:h-5 prose-img:rounded-full prose-img:m-0 prose-img:mr-1.5 prose-img:align-middle"
                                 dangerouslySetInnerHTML={{ __html: data.historyHtml }}
                             />
                         </div>
