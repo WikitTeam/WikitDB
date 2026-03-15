@@ -28,11 +28,15 @@ export default async function handler(req, res) {
         const html = await response.text();
         const $ = cheerio.load(html);
 
-        let title = $('title').text().trim() || '未命名页面';
-        if (title.includes(' - ')) {
-            const parts = title.split(' - ');
-            if (parts.length > 1) parts.pop();
-            title = parts.join(' - ').trim();
+        // 修复标题：优先抓取页面内部真实的标题容器，而不是头部的 title 标签
+        let title = $('#page-title').text().trim();
+        if (!title) {
+            title = $('title').text().trim() || '未命名页面';
+            if (title.includes(' - ')) {
+                const parts = title.split(' - ');
+                if (parts.length > 1) parts.pop();
+                title = parts.join(' - ').trim();
+            }
         }
 
         const contentHtml = $('#page-content').html() || '<p class="text-gray-400">无法提取到正文区域 (#page-content)。</p>';
@@ -43,9 +47,19 @@ export default async function handler(req, res) {
             if(t && !t.startsWith('_')) tags.push(t);
         });
 
-        let creator = $('#page-info .printuser').last().text().trim();
-        if (!creator) creator = '未知 (原站未提供)';
+        // 修复作者：增加多重 fallback 机制，适配不同的 Wikidot 主题结构
+        let creator = '';
+        const printusers = $('.printuser');
+        if (printusers.length > 0) {
+            creator = printusers.last().text().trim();
+        }
+        if (!creator) {
+            // 尝试抓取可能被改写的位置
+            creator = $('#page-info a[href*="/user:info/"]').first().text().trim();
+        }
+        if (!creator) creator = '未知 (原站未提供静态数据)';
         
+        // 修复时间提取
         let lastUpdated = $('#page-info .odate').text().trim();
         if (!lastUpdated) lastUpdated = '未知';
 
@@ -91,6 +105,13 @@ export default async function handler(req, res) {
                     const histData = await histRes.json();
                     if (histData.status === 'ok') {
                         historyHtml = histData.body;
+                        
+                        // 如果前面静态提取作者失败，尝试从历史记录表格的第一行（即创建者）提取
+                        if (creator === '未知 (原站未提供静态数据)') {
+                            const $hist = cheerio.load(historyHtml);
+                            const originalCreator = $hist('tr').last().find('.printuser').text().trim();
+                            if (originalCreator) creator = originalCreator + ' (从历史记录提取)';
+                        }
                     }
                 } catch (e) {}
 
