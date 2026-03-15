@@ -10,7 +10,7 @@ const PageDetail = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [activeTab, setActiveTab] = useState('源码');
+    const [activeTab, setActiveTab] = useState('讨论');
 
     const tabs = ['正文', '源码', '信息', '历史', '讨论'];
 
@@ -212,11 +212,11 @@ const PageDetail = () => {
                     )}
 
                     {activeTab === '讨论' && (
-                        <div className="text-center py-16 border border-dashed border-gray-700 rounded-lg bg-gray-900/20">
-                            <div className="text-gray-300 mb-2 font-medium">讨论区暂未接入</div>
-                            <div className="text-sm text-gray-500 max-w-lg mx-auto">
-                                铸币 看什么呢
-                            </div>
+                        <div className="bg-gray-900/50 p-4 rounded-lg overflow-x-auto border border-gray-700">
+                            <div 
+                                className="prose prose-invert max-w-none text-sm break-words"
+                                dangerouslySetInnerHTML={{ __html: data.discussionHtml }}
+                            />
                         </div>
                     )}
                 </div>
