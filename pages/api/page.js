@@ -30,21 +30,32 @@ export default async function handler(req, res) {
         const html = await response.text();
         const $ = cheerio.load(html);
 
-        // 提取标题，去掉 "- Wikidot" 等后缀
         let title = $('title').text();
         if (title.includes('-')) {
             title = title.split('-')[0].trim();
         }
 
-        // 提取 Wikidot 标准正文内容
         const contentHtml = $('#page-content').html() || '<p class="text-gray-400">无法提取到正文区域 (#page-content)。</p>';
+
+        // 提取页面标签
+        const tags = [];
+        $('.page-tags a').each((i, el) => {
+            tags.push($(el).text().trim());
+        });
+
+        // 提取 Wikidot 的创建者/最后编辑者和更新时间
+        const creator = $('#page-info .printuser').last().text().trim() || '未知';
+        const lastUpdated = $('#page-info .odate').text().trim() || '未知';
 
         res.status(200).json({
             siteName: wikiConfig.NAME,
             siteImg: wikiConfig.ImgURL,
             originalUrl: url,
             title: title,
-            content: contentHtml
+            content: contentHtml,
+            tags: tags,
+            creator: creator,
+            lastUpdated: lastUpdated
         });
     } catch (error) {
         res.status(500).json({ error: '详情页抓取失败', details: error.message });
