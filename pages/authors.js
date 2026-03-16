@@ -9,8 +9,8 @@ const AuthorProfile = () => {
     const { name } = router.query;
 
     const [searchInput, setSearchInput] = useState('');
-    const [data, setData] = useState(null);           // 用于存储单个作者数据
-    const [rankingData, setRankingData] = useState(null); // 用于存储排行榜数据
+    const [data, setData] = useState(null);
+    const [rankingData, setRankingData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('global');
@@ -18,7 +18,7 @@ const AuthorProfile = () => {
     useEffect(() => {
         if (!router.isReady) return;
 
-        // 如果 URL 中有 name 参数，搜索该作者；否则，拉取并展示排行榜
+        // 有 name 查人，没 name 看榜
         if (name) {
             setSearchInput(name);
             fetchAuthorData(name);
@@ -42,7 +42,8 @@ const AuthorProfile = () => {
                 throw new Error(result.details || result.error || '请求失败');
             }
 
-            if (result.pages && result.pages.length > 0) {
+            // 文章按时间倒序
+            if (result.pages?.length > 0) {
                 result.pages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             }
 
@@ -81,7 +82,7 @@ const AuthorProfile = () => {
         }
     };
 
-    // 计算当前应当显示的排行榜列表
+    // 切换排行榜数据源
     let currentRankingList = [];
     if (rankingData) {
         if (activeTab === 'global') {
@@ -101,7 +102,6 @@ const AuthorProfile = () => {
             <div className="py-8">
                 <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-700 pb-6">
                     <h1 className="text-3xl font-bold text-white">
-                        {/* 核心修改：将原本的 '作者信息查询' 修改为更简洁的 '作者信息' */}
                         {data ? '作者信息' : '作者评分排行榜'}
                     </h1>
                     
@@ -131,7 +131,7 @@ const AuthorProfile = () => {
                     </div>
                 )}
 
-                {/* 状态 1：展示具体的作者主页 */}
+                {/* 作者主页视图 */}
                 {data && !loading && (
                     <div className="space-y-8">
                         <div className="flex items-center gap-6">
@@ -158,7 +158,7 @@ const AuthorProfile = () => {
                                 平均评分为 <span className="font-semibold text-white">{data.averageRating > 0 ? `+${data.averageRating}` : data.averageRating}</span>。
                             </p>
 
-                            {data.siteStats && data.siteStats.length > 0 && (
+                            {data.siteStats?.length > 0 && (
                                 <>
                                     <h4 className="text-lg font-medium text-white mb-3">所属站点数据分布：</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -191,7 +191,7 @@ const AuthorProfile = () => {
                                 所有发布页面 <span className="text-sm font-normal text-gray-400">(按创建时间倒序)</span>
                             </h3>
                             
-                            {data.pages.length > 0 ? (
+                            {data.pages?.length > 0 ? (
                                 <div className="space-y-4">
                                     {data.pages.map((page, index) => {
                                         const siteConfig = config.SUPPORT_WIKI.find(w => w.URL.includes(page.wiki));
@@ -238,7 +238,7 @@ const AuthorProfile = () => {
                     </div>
                 )}
 
-                {/* 状态 2：展示默认的排行榜 */}
+                {/* 排行榜视图 */}
                 {!data && rankingData && !loading && (
                     <div className="space-y-6">
                         <div className="flex flex-wrap gap-4 border-b border-gray-700 pb-4">
@@ -278,7 +278,7 @@ const AuthorProfile = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {currentRankingList.length > 0 ? (
+                                        {currentRankingList?.length > 0 ? (
                                             currentRankingList.map((author, index) => (
                                                 <tr key={index} className="border-b border-gray-700/50 hover:bg-gray-700/20 transition-colors">
                                                     <td className="p-4">
