@@ -1,10 +1,6 @@
 import * as cheerio from 'cheerio';
 const config = require('../../wikitdb.config.js');
 
-// 内存缓存，用于瞬间返回已抓取过的站点索引
-const cache = new Map();
-const CACHE_TTL = 1000 * 60 * 60; // 缓存有效期 1 小时
-
 export default async function handler(req, res) {
     const { site } = req.query;
 
@@ -12,15 +8,6 @@ export default async function handler(req, res) {
 
     const wikiConfig = config.SUPPORT_WIKI.find(w => w.PARAM === site);
     if (!wikiConfig) return res.status(404).json({ error: '未找到该站点配置' });
-
-    // 检查缓存是否命中
-    if (cache.has(site)) {
-        const cachedData = cache.get(site);
-        if (Date.now() - cachedData.timestamp < CACHE_TTL) {
-            res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
-            return res.status(200).json(cachedData.data);
-        }
-    }
 
     let actualWikiName = '';
     try {
@@ -44,44 +31,61 @@ export default async function handler(req, res) {
         let pageTitle = "全站页面索引";
 
         try {
-            // 根据 Kakushi 的建议，将安全上限调整为 100
             const pageSize = 100;
-            let currentPage = 1;
-            let hasNextPage = true;
+            const buildQuery = (page) => JSON.stringify({
+                query: `query { articles(wiki: ["${actualWikiName}"], page: ${page}, pageSize: ${pageSize}) { nodes { title url page } pageInfo { total hasNextPage } } }`
+            });
 
-            while (hasNextPage) {
-                const gqlRes = await fetch('https://wikit.unitreaty.org/apiv1/graphql', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        query: `query { articles(wiki: ["${actualWikiName}"], page: ${currentPage}, pageSize: ${pageSize}) { nodes { title url page } pageInfo { hasNextPage } } }`
-                    }),
-                    cache: 'no-store'
-                });
+            const firstRes = await fetch('https://wikit.unitreaty.org/apiv1/graphql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: buildQuery(1),
+                cache: 'no-store'
+            });
 
-                if (gqlRes.ok) {
-                    const gqlJson = await gqlRes.json();
-                    const articlesData = gqlJson.data?.articles;
-                    
-                    if (articlesData && articlesData.nodes && articlesData.nodes.length > 0) {
-                        articlesData.nodes.forEach(node => {
-                            const fullHref = node.url || `${baseUrl}/${node.page}`;
-                            const text = node.title || node.page;
-                            
-                            if (fullHref.startsWith(baseUrl) && !fullHref.includes('/system:') && !fullHref.includes('/admin:') && !fullHref.includes('/component:') && !fullHref.includes('user:info')) {
-                                if (!seen.has(fullHref)) {
-                                    seen.add(fullHref);
-                                    links.push({ text: text, href: fullHref });
-                                }
+            if (firstRes.ok) {
+                const firstJson = await firstRes.json();
+                const articlesData = firstJson.data?.articles;
+
+                const processNodes = (nodes) => {
+                    if (!nodes) return;
+                    nodes.forEach(node => {
+                        const fullHref = node.url || `${baseUrl}/${node.page}`;
+                        const text = node.title || node.page;
+                        
+                        if (fullHref.startsWith(baseUrl) && !fullHref.includes('/system:') && !fullHref.includes('/admin:') && !fullHref.includes('/component:') && !fullHref.includes('user:info')) {
+                            if (!seen.has(fullHref)) {
+                                seen.add(fullHref);
+                                links.push({ text: text, href: fullHref });
                             }
-                        });
-                        hasNextPage = articlesData.pageInfo?.hasNextPage || false;
-                        currentPage++;
-                    } else {
-                        hasNextPage = false;
+                        }
+                    });
+                };
+
+                processNodes(articlesData?.nodes);
+
+                const totalItems = articlesData?.pageInfo?.total || 0;
+                const totalPages = Math.ceil(totalItems / pageSize);
+
+                if (totalPages > 1) {
+                    const fetchPromises = [];
+                    for (let i = 2; i <= totalPages; i++) {
+                        fetchPromises.push(
+                            fetch('https://wikit.unitreaty.org/apiv1/graphql', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: buildQuery(i),
+                                cache: 'no-store'
+                            }).then(res => res.json()).catch(() => null)
+                        );
                     }
-                } else {
-                    hasNextPage = false;
+
+                    const results = await Promise.all(fetchPromises);
+                    results.forEach(json => {
+                        if (json && json.data && json.data.articles) {
+                            processNodes(json.data.articles.nodes);
+                        }
+                    });
                 }
             }
         } catch (e) {}
@@ -140,21 +144,16 @@ export default async function handler(req, res) {
             } catch (e) {}
         }
 
-        const responseData = {
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+
+        res.status(200).json({
             siteName: wikiConfig.NAME,
             siteUrl: wikiConfig.URL,
             pageTitle: links.length > 0 ? (seen.size > 20 ? "Wikit API 全站索引" : pageTitle) : pageTitle,
             links: links
-        };
-
-        // 写入内存缓存
-        cache.set(site, {
-            timestamp: Date.now(),
-            data: responseData
         });
-
-        res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
-        res.status(200).json(responseData);
     } catch (error) {
         res.status(500).json({ error: '全站页面抓取失败', details: error.message });
     }
