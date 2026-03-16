@@ -8,7 +8,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: '缺少有效的 site 或 page 参数' });
     }
 
-    // 核心修复 1：绝对防御。哪怕前端传来了完整的外链网址，强制只截取最后一段干净的页面名
     let rawPage = page.split('|')[0].split('#')[0].trim().toLowerCase();
     const pageName = rawPage.replace(/\/$/, '').split('/').pop();
 
@@ -17,6 +16,8 @@ export default async function handler(req, res) {
         return res.status(404).json({ error: '未找到该站点配置' });
     }
 
+    // 核心修复：提取真实的 wiki 名称，喂给 GraphQL 和历史接口
+    const actualWikiName = wikiConfig.URL.replace(/^https?:\/\//i, '').split('.')[0];
     const baseUrl = wikiConfig.URL.replace(/\/$/, '');
     const secureUrl = `${baseUrl}/${pageName}`;
 
@@ -32,7 +33,8 @@ export default async function handler(req, res) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    query: `query { article(wiki: "${site}", page: "${pageName}") { title rating author tags created_at lastmod } }`
+                    // 使用 actualWikiName 替换 site
+                    query: `query { article(wiki: "${actualWikiName}", page: "${pageName}") { title rating author tags created_at lastmod } }`
                 }),
                 cache: 'no-store'
             }),
@@ -96,7 +98,6 @@ export default async function handler(req, res) {
 
         let lastUpdated = gqlData?.lastmod;
         if (!lastUpdated) {
-            // 核心修复 2：强制加上 .first() 获取单一节点，拒绝多个隐藏时间连体
             lastUpdated = $('#page-info .odate').first().text().trim() || $('.odate').first().text().trim() || '未知';
         } else {
             lastUpdated = new Date(lastUpdated).toLocaleString('zh-CN', { hour12: false });
@@ -106,7 +107,8 @@ export default async function handler(req, res) {
         let wikitHistoryFailed = false; 
 
         try {
-            const wikitHistUrl = `https://wikit.unitreaty.org/wikidot/pagehistory?wiki=${site}&page=${encodeURIComponent(secureUrl)}`;
+            // 同样使用 actualWikiName
+            const wikitHistUrl = `https://wikit.unitreaty.org/wikidot/pagehistory?wiki=${actualWikiName}&page=${encodeURIComponent(secureUrl)}`;
             const histRes = await fetch(wikitHistUrl, {
                 method: 'GET',
                 headers: { 'User-Agent': fetchHeaders['User-Agent'] },
