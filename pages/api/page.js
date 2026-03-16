@@ -99,8 +99,10 @@ export default async function handler(req, res) {
             creatorAvatar = `https://www.wikidot.com${creatorAvatar.startsWith('/') ? '' : '/'}${creatorAvatar}`;
         }
 
-        // 接入 Wikit 历史记录接口
-        let historyHtml = '<div class="text-gray-500">历史记录抓取中...</div>';
+        // 核心修复：Wikit 历史接口的双引擎兜底逻辑
+        let historyHtml = '';
+        let wikitHistoryFailed = false; 
+
         try {
             const wikitHistUrl = `https://wikit.unitreaty.org/wikidot/pagehistory?wiki=${site}&page=${encodeURIComponent(secureUrl)}`;
             const histRes = await fetch(wikitHistUrl, {
@@ -113,9 +115,15 @@ export default async function handler(req, res) {
                 const histText = await histRes.text();
                 try {
                     const histJson = JSON.parse(histText);
-                    historyHtml = histJson.body || histJson.html || histText;
+                    // 如果 Wikit 返回了 empty_history_body 报错，或者返回了纯 JSON 数据（没有头像）
+                    // 标记为失败，交由底层的原生 Wikidot AJAX 接口进行带头像的 UI 兜底
+                    if (histJson.error || Array.isArray(histJson)) {
+                        wikitHistoryFailed = true;
+                    } else {
+                        historyHtml = histJson.body || histJson.html || histText;
+                    }
                 } catch (e) {
-                    if (histText.includes('<html')) {
+                    if (histText.includes('<html') || histText.includes('<table')) {
                         const $hist = cheerio.load(histText);
                         historyHtml = $hist('table.page-history').length ? $hist('table.page-history').parent().html() : $hist('body').html() || histText;
                     } else {
@@ -123,10 +131,10 @@ export default async function handler(req, res) {
                     }
                 }
             } else {
-                historyHtml = `<div class="text-gray-500">Wikit API 返回错误: ${histRes.status}</div>`;
+                wikitHistoryFailed = true;
             }
         } catch (e) {
-            historyHtml = `<div class="text-red-400">请求 Wikit 历史接口异常: ${e.message}</div>`;
+            wikitHistoryFailed = true;
         }
 
         let pageId = null;
@@ -151,16 +159,33 @@ export default async function handler(req, res) {
                 'Cookie': 'wikidot_token7=123456;'
             };
 
-            try {
-                const srcRes = await fetch(ajaxUrl, {
+            const fetchPromises = [
+                fetch(ajaxUrl, {
                     method: 'POST',
                     headers: ajaxHeaders,
                     body: `page_id=${pageId}&moduleName=viewsource/ViewSourceModule&wikidot_token7=123456`,
                     cache: 'no-store'
-                });
+                })
+            ];
 
-                if (srcRes.ok) {
-                    const data = await srcRes.json();
+            // 只有当 Wikit 接口失败或无头像时，才启动底层的历史记录抓取引擎
+            if (wikitHistoryFailed) {
+                fetchPromises.push(
+                    fetch(ajaxUrl, {
+                        method: 'POST',
+                        headers: ajaxHeaders,
+                        body: `page_id=${pageId}&moduleName=history/PageRevisionListModule&page=1&perpage=50&wikidot_token7=123456`,
+                        cache: 'no-store'
+                    })
+                );
+            }
+
+            const results = await Promise.allSettled(fetchPromises);
+
+            const srcRes = results[0];
+            if (srcRes.status === 'fulfilled' && srcRes.value.ok) {
+                try {
+                    const data = await srcRes.value.json();
                     if (data.status === 'ok') {
                         const $src = cheerio.load(data.body);
                         let rawHtml = $src('.page-source').html() || data.body;
@@ -173,12 +198,33 @@ export default async function handler(req, res) {
                     } else {
                         sourceCode = `请求源码失败，原站返回: ${data.status}`;
                     }
-                } else {
-                    sourceCode = `请求源码网络错误，可能被原站拦截`;
+                } catch(e) {
+                    sourceCode = `解析源码数据异常: ${e.message}`;
                 }
-            } catch (e) {
-                sourceCode = `解析源码数据异常: ${e.message}`;
+            } else {
+                sourceCode = `请求源码网络错误，可能被原站拦截`;
             }
+
+            // 原生历史记录兜底逻辑生效
+            if (wikitHistoryFailed && results[1]) {
+                const histRes = results[1];
+                if (histRes.status === 'fulfilled' && histRes.value.ok) {
+                    try {
+                        const data = await histRes.value.json();
+                        if (data.status === 'ok') {
+                            historyHtml = data.body;
+                        } else {
+                            historyHtml = `<div class="text-gray-500">原生历史请求失败，原站返回: ${data.status}</div>`;
+                        }
+                    } catch(e) {
+                        historyHtml = `<div class="text-red-400">原生历史解析异常: ${e.message}</div>`;
+                    }
+                } else {
+                    historyHtml = `<div class="text-gray-500">Wikit 历史为空，且原生历史请求被拦截。</div>`;
+                }
+            }
+        } else if (wikitHistoryFailed) {
+            historyHtml = '<div class="text-gray-500">历史记录抓取失败：Wikit 接口无数据，且未能在原站网页中解析到 pageId 进行兜底抓取。</div>';
         }
 
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
