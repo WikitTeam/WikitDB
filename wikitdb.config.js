@@ -29,7 +29,7 @@ module.exports = {
         {
             NAME: "SCP基金会云国分部",
             URL: "https://scp-wiki-cloud.wikidot.com/",
-            ImgURL: "none",
+            ImgURL: "https://scp-wiki-cloud.wdfiles.com/local--files/start/scp-cloud-logo.png",
             PARAM: "scp-wiki-cloud",
             WIKIT_ID: "scp-wiki-cloud"
         }
