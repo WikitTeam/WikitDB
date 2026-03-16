@@ -33,7 +33,7 @@ const AuthorProfile = () => {
         setLoading(true);
         setError(null);
         setData(null);
-        setFilterSite('all'); // 每次搜新作者，下拉框默认重置为全站
+        setFilterSite('all');
 
         try {
             const res = await fetch(`/api/authors?name=${encodeURIComponent(authorName)}`);
@@ -94,28 +94,19 @@ const AuthorProfile = () => {
         }
     }
 
-    // ==========================================
-    // 核心过滤逻辑：落实你的 WIKIT_ID 桥接检测方案
-    // ==========================================
+    // 1. 动态计算各个站点的实际文章数量 (完全基于底层简写)
+    const siteCounts = {};
+    if (data && data.pages) {
+        data.pages.forEach(page => {
+            siteCounts[page.wiki] = (siteCounts[page.wiki] || 0) + 1;
+        });
+    }
+
+    // 2. 极简过滤逻辑：直接匹配底层简写
     const displayedPages = data && data.pages ? (
         filterSite === 'all' 
             ? data.pages 
-            : data.pages.filter(page => {
-                // filterSite 是下拉框里选中的站名 (比如 "The Backrooms-IF")
-                // 我们去 config 里找：哪个站点的 RANKING_NAME 或 NAME 是这个？
-                const targetSiteConfig = config.SUPPORT_WIKI.find(w => 
-                    w.RANKING_NAME === filterSite || w.NAME === filterSite || w.WIKIT_ID === filterSite
-                );
-                
-                // 如果在 config 里找到了对应的站点，且你配置了 WIKIT_ID
-                if (targetSiteConfig && targetSiteConfig.WIKIT_ID) {
-                    // 正如你所说：直接检测返回的文章 wiki 参数是否与配置的 WIKIT_ID 相同！
-                    return page.wiki === targetSiteConfig.WIKIT_ID;
-                }
-                
-                // 兜底（未被收录在 config 里的外站，强行比较）
-                return page.wiki === filterSite;
-            })
+            : data.pages.filter(page => page.wiki === filterSite)
     ) : [];
 
     return (
@@ -187,8 +178,7 @@ const AuthorProfile = () => {
                                     <h4 className="text-lg font-medium text-white mb-3">所属站点数据分布：</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                         {data.siteStats.map((site, index) => {
-                                            // 利用 RANKING_NAME 把排行榜的站点名称替换为你配置的好看名称
-                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.RANKING_NAME === site.wiki || w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
+                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
                                             const siteName = siteConfig ? siteConfig.NAME : site.wiki;
                                             return (
                                                 <div key={index} className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
@@ -217,19 +207,20 @@ const AuthorProfile = () => {
                                     所有发布页面 <span className="text-sm font-normal text-gray-400">(按创建时间倒序)</span>
                                 </h3>
                                 
-                                {data.siteStats && data.siteStats.length > 0 && (
+                                {/* 完全根据实际文章数据生成下拉框，彻底杜绝匹配失效 */}
+                                {Object.keys(siteCounts).length > 0 && (
                                     <select
                                         value={filterSite}
                                         onChange={(e) => setFilterSite(e.target.value)}
                                         className="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2 outline-none cursor-pointer transition-colors"
                                     >
                                         <option value="all">全站总览 (All Sites)</option>
-                                        {data.siteStats.map((site, index) => {
-                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.RANKING_NAME === site.wiki || w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
-                                            const siteName = siteConfig ? siteConfig.NAME : site.wiki;
+                                        {Object.entries(siteCounts).map(([wikiId, count]) => {
+                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === wikiId || w.URL.includes(wikiId));
+                                            const siteName = siteConfig ? siteConfig.NAME : wikiId;
                                             return (
-                                                <option key={index} value={site.wiki}>
-                                                    {siteName} ({site.count} 篇)
+                                                <option key={wikiId} value={wikiId}>
+                                                    {siteName} ({count} 篇)
                                                 </option>
                                             );
                                         })}
@@ -240,7 +231,6 @@ const AuthorProfile = () => {
                             {displayedPages.length > 0 ? (
                                 <div className="space-y-4">
                                     {displayedPages.map((page, index) => {
-                                        // 匹配列表渲染：也利用 WIKIT_ID 进行桥接找配置
                                         const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === page.wiki || w.URL.includes(page.wiki));
                                         const siteParam = siteConfig ? siteConfig.PARAM : page.wiki;
                                         const dateStr = page.created_at ? new Date(page.created_at).toLocaleDateString('zh-CN') : '未知时间';
