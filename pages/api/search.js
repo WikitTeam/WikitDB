@@ -1,7 +1,7 @@
 const config = require('../../wikitdb.config.js');
 
 export default async function handler(req, res) {
-    const { site, q } = req.query;
+    const { site, q, p } = req.query;
 
     if (!site) return res.status(400).json({ error: '缺少 site 参数' });
 
@@ -17,12 +17,12 @@ export default async function handler(req, res) {
     }
 
     const keyword = q ? q.trim() : '';
+    const currentPage = parseInt(p, 10) || 1;
+    const pageSize = 50;
 
     try {
-        // 策略 A：尝试使用 GraphQL 的参数直接搜索 (按最新时间倒序拉取 50 条)
-        // 注意：不同后端的模糊查询语法可能不同，这里尝试使用包含语法
         const queryFilter = keyword ? `, title: "%${keyword}%"` : '';
-        const query = `query { articles(wiki: ["${actualWikiName}"]${queryFilter}, page: 1, pageSize: 50) { nodes { title page wiki rating created_at } } }`;
+        const query = `query { articles(wiki: ["${actualWikiName}"]${queryFilter}, page: ${currentPage}, pageSize: ${pageSize}) { nodes { title page wiki rating created_at } pageInfo { total } } }`;
 
         const gqlRes = await fetch('https://wikit.unitreaty.org/apiv1/graphql', {
             method: 'POST',
@@ -35,26 +35,27 @@ export default async function handler(req, res) {
 
         const gqlJson = await gqlRes.json();
         
-        // 如果 GraphQL 不支持这种搜索语法并抛出错误，触发 Catch 进入兜底策略
         if (gqlJson.errors) {
             throw new Error(gqlJson.errors[0].message);
         }
 
         let nodes = gqlJson.data?.articles?.nodes || [];
+        let total = gqlJson.data?.articles?.pageInfo?.total || 0;
         
-        // 按照创建时间进行倒序排序 (最新发布的在最前面)
         nodes.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
         res.status(200).json({
             siteName: wikiConfig.NAME,
-            results: nodes
+            results: nodes,
+            currentPage: currentPage,
+            totalPages: Math.ceil(total / pageSize),
+            totalCount: total
         });
 
     } catch (error) {
-        // 策略 B (兜底)：如果带参数的 GraphQL 搜索报错，说明接口不支持该语法。
-        // 此时我们拉取最新的 500 条数据，然后在 Node.js 本地使用原生 JS 强制进行精准搜索。
+        // 如果 GraphQL 原生检索语法报错，走兜底逻辑：在本地过滤和模拟翻页
         try {
-            const fallbackQuery = `query { articles(wiki: ["${actualWikiName}"], page: 1, pageSize: 500) { nodes { title page wiki rating created_at } } }`;
+            const fallbackQuery = `query { articles(wiki: ["${actualWikiName}"], page: 1, pageSize: 2000) { nodes { title page wiki rating created_at } } }`;
             const fallbackRes = await fetch('https://wikit.unitreaty.org/apiv1/graphql', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -75,9 +76,18 @@ export default async function handler(req, res) {
 
             nodes.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
             
+            const total = nodes.length;
+            const totalPages = Math.ceil(total / pageSize);
+            
+            // 数组切片模拟翻页
+            const slicedNodes = nodes.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+            
             res.status(200).json({
                 siteName: wikiConfig.NAME,
-                results: nodes.slice(0, 50) // 只返回前 50 条结果以保证渲染速度
+                results: slicedNodes,
+                currentPage: currentPage,
+                totalPages: totalPages === 0 ? 1 : totalPages,
+                totalCount: total
             });
         } catch (err) {
             res.status(500).json({ error: '搜索执行失败', details: err.message });
