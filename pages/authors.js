@@ -9,19 +9,27 @@ const AuthorProfile = () => {
     const { name } = router.query;
 
     const [searchInput, setSearchInput] = useState('');
-    const [data, setData] = useState(null);
+    const [data, setData] = useState(null);           // 用于存储单个作者数据
+    const [rankingData, setRankingData] = useState(null); // 用于存储排行榜数据
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [activeTab, setActiveTab] = useState('global');
 
     useEffect(() => {
-        if (router.isReady && name) {
+        if (!router.isReady) return;
+
+        // 如果 URL 中有 name 参数，搜索该作者；否则，拉取并展示排行榜
+        if (name) {
             setSearchInput(name);
             fetchAuthorData(name);
+        } else {
+            setSearchInput('');
+            setData(null);
+            fetchRankingData();
         }
     }, [router.isReady, name]);
 
     const fetchAuthorData = async (authorName) => {
-        if (!authorName) return;
         setLoading(true);
         setError(null);
         setData(null);
@@ -46,6 +54,26 @@ const AuthorProfile = () => {
         }
     };
 
+    const fetchRankingData = async () => {
+        setLoading(true);
+        setError(null);
+        
+        try {
+            const res = await fetch('/api/ranking');
+            const result = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(result.details || result.error || '获取排行榜失败');
+            }
+            
+            setRankingData(result);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSearch = (e) => {
         e.preventDefault();
         if (searchInput.trim()) {
@@ -53,15 +81,28 @@ const AuthorProfile = () => {
         }
     };
 
+    // 计算当前应当显示的排行榜列表
+    let currentRankingList = [];
+    if (rankingData) {
+        if (activeTab === 'global') {
+            currentRankingList = rankingData.global;
+        } else {
+            const siteData = rankingData.sites.find(s => s.param === activeTab);
+            if (siteData) currentRankingList = siteData.ranking;
+        }
+    }
+
     return (
         <>
             <Head>
-                <title>{data ? `${data.name} 的主页 - ${config.SITE_NAME}` : `作者查询 - ${config.SITE_NAME}`}</title>
+                <title>{data ? `${data.name} 的主页 - ${config.SITE_NAME}` : `作者查询与排行 - ${config.SITE_NAME}`}</title>
             </Head>
 
             <div className="py-8">
                 <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-700 pb-6">
-                    <h1 className="text-3xl font-bold text-white">作者信息查询</h1>
+                    <h1 className="text-3xl font-bold text-white">
+                        {data ? '作者信息查询' : '作者评分排行榜'}
+                    </h1>
                     
                     <form onSubmit={handleSearch} className="relative w-full sm:w-80">
                         <input
@@ -89,7 +130,8 @@ const AuthorProfile = () => {
                     </div>
                 )}
 
-                {data && (
+                {/* 状态 1：展示具体的作者主页 */}
+                {data && !loading && (
                     <div className="space-y-8">
                         <div className="flex items-center gap-6">
                             <img 
@@ -106,7 +148,6 @@ const AuthorProfile = () => {
                             </div>
                         </div>
 
-                        {/* 全站数据总览 */}
                         <div className="bg-gray-800/50 rounded-xl p-6 border border-white/10">
                             <h3 className="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2">全站数据总览 (Overview)</h3>
                             <p className="text-gray-300 leading-relaxed mb-6">
@@ -116,7 +157,6 @@ const AuthorProfile = () => {
                                 平均评分为 <span className="font-semibold text-white">{data.averageRating > 0 ? `+${data.averageRating}` : data.averageRating}</span>。
                             </p>
 
-                            {/* 各站点独立排名面板 */}
                             {data.siteStats && data.siteStats.length > 0 && (
                                 <>
                                     <h4 className="text-lg font-medium text-white mb-3">所属站点数据分布：</h4>
@@ -145,7 +185,6 @@ const AuthorProfile = () => {
                             )}
                         </div>
 
-                        {/* 作品列表 */}
                         <div className="bg-gray-800/50 rounded-xl p-6 border border-white/10">
                             <h3 className="text-xl font-semibold text-white mb-4 border-b border-gray-700 pb-2">
                                 所有发布页面 <span className="text-sm font-normal text-gray-400">(按创建时间倒序)</span>
@@ -194,6 +233,86 @@ const AuthorProfile = () => {
                                     未在收录的站点中找到该作者的任何页面。
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* 状态 2：展示默认的排行榜 */}
+                {!data && rankingData && !loading && (
+                    <div className="space-y-6">
+                        <div className="flex flex-wrap gap-4 border-b border-gray-700 pb-4">
+                            <button
+                                onClick={() => setActiveTab('global')}
+                                className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                                    activeTab === 'global'
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                }`}
+                            >
+                                全站总排行
+                            </button>
+                            {rankingData.sites.map((site) => (
+                                <button
+                                    key={site.param}
+                                    onClick={() => setActiveTab(site.param)}
+                                    className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                                        activeTab === site.param
+                                            ? 'bg-indigo-600 text-white'
+                                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    {site.name}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="bg-gray-800/50 rounded-xl border border-white/10 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-900/50 border-b border-gray-700 text-gray-400 text-sm">
+                                            <th className="p-4 font-medium w-24">排名</th>
+                                            <th className="p-4 font-medium">作者</th>
+                                            <th className="p-4 font-medium text-right">总评分</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {currentRankingList.length > 0 ? (
+                                            currentRankingList.map((author, index) => (
+                                                <tr key={index} className="border-b border-gray-700/50 hover:bg-gray-700/20 transition-colors">
+                                                    <td className="p-4">
+                                                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+                                                            author.rank === 1 ? 'bg-yellow-500/20 text-yellow-500' :
+                                                            author.rank === 2 ? 'bg-gray-300/20 text-gray-300' :
+                                                            author.rank === 3 ? 'bg-orange-400/20 text-orange-400' :
+                                                            'bg-gray-800 text-gray-400'
+                                                        }`}>
+                                                            {author.rank}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-4 font-medium">
+                                                        <Link 
+                                                            href={`/authors?name=${encodeURIComponent(author.name)}`}
+                                                            className="text-indigo-400 hover:text-indigo-300 transition-colors"
+                                                        >
+                                                            {author.name}
+                                                        </Link>
+                                                    </td>
+                                                    <td className="p-4 text-right font-semibold text-green-400">
+                                                        +{author.value}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan="3" className="p-8 text-center text-gray-500">
+                                                    暂无排行数据
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )}
