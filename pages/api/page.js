@@ -2,22 +2,21 @@ import * as cheerio from 'cheerio';
 const config = require('../../wikitdb.config.js');
 
 export default async function handler(req, res) {
-    // 核心优化：彻底抛弃 url 参数，改用更安全的 page 页面名
     const { site, page } = req.query;
 
     if (!site || !page || page === 'undefined') {
         return res.status(400).json({ error: '缺少有效的 site 或 page 参数' });
     }
 
-    // 强制清洗页面名
-    const pageName = page.split('|')[0].split('#')[0].trim().toLowerCase();
+    // 核心修复 1：绝对防御。哪怕前端传来了完整的外链网址，强制只截取最后一段干净的页面名
+    let rawPage = page.split('|')[0].split('#')[0].trim().toLowerCase();
+    const pageName = rawPage.replace(/\/$/, '').split('/').pop();
 
     const wikiConfig = config.SUPPORT_WIKI.find(w => w.PARAM === site);
     if (!wikiConfig) {
         return res.status(404).json({ error: '未找到该站点配置' });
     }
 
-    // 后端自动拼接绝对安全的完整 https 链接，用于底层兜底和页面跳转
     const baseUrl = wikiConfig.URL.replace(/\/$/, '');
     const secureUrl = `${baseUrl}/${pageName}`;
 
@@ -32,7 +31,6 @@ export default async function handler(req, res) {
             fetch('https://wikit.unitreaty.org/apiv1/graphql', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // GraphQL 接口严格使用提取好的 pageName
                 body: JSON.stringify({
                     query: `query { article(wiki: "${site}", page: "${pageName}") { title rating author tags created_at lastmod } }`
                 }),
@@ -98,7 +96,8 @@ export default async function handler(req, res) {
 
         let lastUpdated = gqlData?.lastmod;
         if (!lastUpdated) {
-            lastUpdated = $('#page-info .odate').last().text().trim() || $('.odate').last().text().trim() || '未知';
+            // 核心修复 2：强制加上 .first() 获取单一节点，拒绝多个隐藏时间连体
+            lastUpdated = $('#page-info .odate').first().text().trim() || $('.odate').first().text().trim() || '未知';
         } else {
             lastUpdated = new Date(lastUpdated).toLocaleString('zh-CN', { hour12: false });
         }
@@ -107,7 +106,6 @@ export default async function handler(req, res) {
         let wikitHistoryFailed = false; 
 
         try {
-            // Wikit 历史接口严格使用拼接好的完整 secureUrl
             const wikitHistUrl = `https://wikit.unitreaty.org/wikidot/pagehistory?wiki=${site}&page=${encodeURIComponent(secureUrl)}`;
             const histRes = await fetch(wikitHistUrl, {
                 method: 'GET',
