@@ -2,7 +2,6 @@ const config = require('../../wikitdb.config.js');
 
 export default async function handler(req, res) {
     try {
-        // 解析配置文件，提取真实的 wiki 子域名
         const sites = config.SUPPORT_WIKI.map(wikiConfig => {
             let actualWikiName = '';
             try {
@@ -14,68 +13,55 @@ export default async function handler(req, res) {
             return { param: wikiConfig.PARAM, name: wikiConfig.NAME, actualName: actualWikiName };
         });
 
-        // 组合查询：同时请求全站和所有子站的排行榜 (pageSize 可以适当大一些，拉取所有数据)
-        const pageSize = 500;
-        let queryParts = [`global: authorRanking(by: RATING, page: 1, pageSize: ${pageSize}) { name value }`];
-        sites.forEach((site, index) => {
-            queryParts.push(`site_${index}: authorRanking(wiki: "${site.actualName}", by: RATING, page: 1, pageSize: ${pageSize}) { name value }`);
-        });
-
-        const query = `query { ${queryParts.join('\n')} }`;
-
-        const gqlRes = await fetch('https://wikit.unitreaty.org/apiv1/graphql', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query }),
-            cache: 'no-store'
-        });
-
-        if (!gqlRes.ok) {
-            throw new Error(`Wikit GraphQL 请求失败，状态码: ${gqlRes.status}`);
-        }
-
-        const gqlJson = await gqlRes.json();
-        
-        if (gqlJson.errors) {
-            throw new Error(gqlJson.errors[0].message);
-        }
-
-        const rawData = gqlJson.data;
-
-        // ---------------------------------------------------------
-        // 核心修复逻辑：手动执行排序并重新赋 rank
-        // ---------------------------------------------------------
-        
-        // 1. 定义一个通用的排序 + 赋 rank 的函数
-        const sortAndRankDescending = (arr) => {
-            if (!arr || !Array.isArray(arr)) return [];
-            
-            // 先按 value 进行强制降序排序 (从大到小)
-            const sortedArr = [...arr].sort((a, b) => b.value - a.value);
-
-            // 根据新的索引重新赋予 rank 字段 (排名从 1 开始)
-            return sortedArr.map((item, index) => ({
-                ...item,
-                rank: index + 1
-            }));
+        // 核心修复：独立封装安全的 GraphQL 请求函数，强力拦截 PHP 报错
+        const fetchSafeGraphQL = async (queryStr) => {
+            try {
+                const gqlRes = await fetch('https://wikit.unitreaty.org/apiv1/graphql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: queryStr }),
+                    cache: 'no-store'
+                });
+                
+                const text = await gqlRes.text();
+                
+                // 尝试解析 JSON，如果遇到 <br /> <b> 等 PHP 崩溃页面，会直接跳入 catch
+                const json = JSON.parse(text);
+                if (json.errors) return [];
+                
+                // 提取请求别名对应的数据
+                const keys = Object.keys(json.data || {});
+                if (keys.length > 0) return json.data[keys[0]] || [];
+                
+                return [];
+            } catch (e) {
+                // 遇到非 JSON 的报错数据直接静默返回空数组，绝不引发整体崩溃
+                return [];
+            }
         };
 
-        // 2. 对全站总排行应用新的逻辑
-        const sortedGlobalList = sortAndRankDescending(rawData.global);
+        // 将原本庞大的一体化查询拆分为轻量级的并发查询，防止打挂 Wikit 的服务器
+        const fetchPromises = [
+            fetchSafeGraphQL(`query { global: authorRanking(by: RATING) { rank name value } }`)
+        ];
 
-        // 3. 整理返回数据格式
+        sites.forEach(site => {
+            fetchPromises.push(
+                fetchSafeGraphQL(`query { siteRank: authorRanking(wiki: "${site.actualName}", by: RATING) { rank name value } }`)
+            );
+        });
+
+        const results = await Promise.all(fetchPromises);
+
         const responseData = {
-            global: sortedGlobalList, // 使用排序 + 赋 rank 后的列表
+            global: results[0],
             sites: sites.map((site, index) => ({
                 param: site.param,
                 name: site.name,
-                // 对子站点的排行榜也应用相同的逻辑
-                ranking: sortAndRankDescending(rawData[`site_${index}`])
+                ranking: results[index + 1]
             }))
         };
 
-        // ---------------------------------------------------------
-        
         res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
         res.status(200).json(responseData);
     } catch (error) {
