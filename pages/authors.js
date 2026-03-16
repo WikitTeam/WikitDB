@@ -14,8 +14,6 @@ const AuthorProfile = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('global');
-    
-    // 新增：用于存储当前选择的过滤站点
     const [filterSite, setFilterSite] = useState('all');
 
     useEffect(() => {
@@ -35,7 +33,7 @@ const AuthorProfile = () => {
         setLoading(true);
         setError(null);
         setData(null);
-        setFilterSite('all'); // 每次查询新作者时，重置筛选器为“全部”
+        setFilterSite('all');
 
         try {
             const res = await fetch(`/api/authors?name=${encodeURIComponent(authorName)}`);
@@ -81,6 +79,9 @@ const AuthorProfile = () => {
         e.preventDefault();
         if (searchInput.trim()) {
             router.push(`/authors?name=${encodeURIComponent(searchInput.trim())}`, undefined, { shallow: true });
+        } else {
+            // 如果清空搜索框回车，则返回排行榜
+            router.push(`/authors`, undefined, { shallow: true });
         }
     };
 
@@ -94,7 +95,6 @@ const AuthorProfile = () => {
         }
     }
 
-    // 新增：根据下拉框的选择，动态过滤要展示的作品列表
     const displayedPages = data && data.pages ? (
         filterSite === 'all' 
             ? data.pages 
@@ -110,7 +110,8 @@ const AuthorProfile = () => {
             <div className="py-8">
                 <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-700 pb-6">
                     <h1 className="text-3xl font-bold text-white">
-                        {data ? '作者信息' : '作者评分排行榜'}
+                        {/* 修复：只要在搜索模式下（有 name），标题就固定为作者信息 */}
+                        {name ? '作者信息' : '作者评分排行榜'}
                     </h1>
                     
                     <form onSubmit={handleSearch} className="relative w-full sm:w-80">
@@ -200,7 +201,6 @@ const AuthorProfile = () => {
                                     所有发布页面 <span className="text-sm font-normal text-gray-400">(按创建时间倒序)</span>
                                 </h3>
                                 
-                                {/* 核心更新：媲美 Crom 的独立站点筛选器 */}
                                 {data.siteStats?.length > 0 && (
                                     <select
                                         value={filterSite}
@@ -269,7 +269,8 @@ const AuthorProfile = () => {
                 )}
 
                 {/* 排行榜视图 */}
-                {!data && rankingData && !loading && (
+                {/* 修复：只有在 URL 没有 name 参数（非搜索状态）时，才显示排行榜 */}
+                {!name && rankingData && !loading && (
                     <div className="space-y-6">
                         <div className="flex flex-wrap gap-4 border-b border-gray-700 pb-4">
                             <button
