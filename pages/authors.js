@@ -94,23 +94,27 @@ const AuthorProfile = () => {
         }
     }
 
-    // 核心修复：无死角匹配逻辑
+    // 核心修复：智能桥接过滤逻辑
     const displayedPages = data && data.pages ? (
         filterSite === 'all' 
             ? data.pages 
             : data.pages.filter(page => {
-                const targetSiteConfig = config.SUPPORT_WIKI.find(w => 
+                // 1. 动态直通：应对没被配置收录的外站（两边都是简写，直接匹配通过）
+                if (page.wiki === filterSite) return true;
+                
+                // 2. 桥接翻译：如果下拉框选的是中文名，去 config 里找它的 WIKIT_ID(简写)
+                const siteConfig = config.SUPPORT_WIKI.find(w => 
                     w.NAME === filterSite || w.WIKIT_ID === filterSite
                 );
                 
-                if (targetSiteConfig) {
-                    // 不管文章的 wiki 字段是简写、中文名还是包含在 URL 里，只要中一个就算匹配成功
-                    return page.wiki === targetSiteConfig.WIKIT_ID || 
-                           page.wiki === targetSiteConfig.NAME || 
-                           (targetSiteConfig.URL && targetSiteConfig.URL.includes(page.wiki));
+                // 3. 翻译验证：用找到的简写(WIKIT_ID)去验证文章的标识(page.wiki)
+                if (siteConfig) {
+                    return page.wiki === siteConfig.WIKIT_ID || 
+                           page.wiki === siteConfig.NAME || 
+                           (siteConfig.URL && siteConfig.URL.includes(page.wiki));
                 }
                 
-                return page.wiki === filterSite;
+                return false;
             })
     ) : [];
 
