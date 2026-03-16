@@ -25,6 +25,13 @@ module.exports = {
             ImgURL: "https://ubmh.wdfiles.com/local--files/admin%3Atheme/ubmh.webp",
             PARAM: "ubmh",
             WIKIT_ID: "ubmh"
+        },
+        {
+            NAME: "SCP基金会云国分部",
+            URL: "https://scp-wiki-cloud.wikidot.com/",
+            ImgURL: "none",
+            PARAM: "scp-wiki-cloud",
+            WIKIT_ID: "scp-wiki-cloud"
         }
     ]
 };
