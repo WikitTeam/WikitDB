@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
 import { useRouter } from 'next/router';
 const config = require('../wikitdb.config.js');
 
@@ -104,13 +103,21 @@ const PageDetail = () => {
                                         <span className="text-gray-500">原网页最后更新:</span>
                                         <span>{data.lastUpdated}</span>
                                     </div>
+                                    
                                     <div className="flex items-center gap-2">
                                         <span className="text-gray-500">页面评分:</span>
-                                        <span className={`font-medium ${data.rating.includes('+') ? 'text-green-400' : data.rating.includes('-') ? 'text-red-400' : 'text-gray-300'}`}>
-                                            {data.rating}
-                                        </span>
+                                        <div className="flex items-center">
+                                            <span className={`font-medium ${data.rating && data.rating.toString().includes('+') ? 'text-green-400' : data.rating && data.rating.toString().includes('-') ? 'text-red-400' : 'text-gray-300'}`}>
+                                                {data.rating}
+                                            </span>
+                                            {data.upvotes !== undefined && data.downvotes !== undefined && (
+                                                <span className="text-gray-400 text-sm ml-1.5 font-medium">
+                                                    (+{data.upvotes}, -{data.downvotes})
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                    {/* 页面 ID 紧贴在页面评分右侧 */}
+
                                     {data.pageId && (
                                         <div className="flex items-center gap-2">
                                             <span className="text-gray-500">页面 ID:</span>
@@ -231,36 +238,10 @@ const PageDetail = () => {
                     )}
 
                     {activeTab === '评分' && (
-                        <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-700">
-                            {data.ratingTable && data.ratingTable.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    {data.ratingTable.map((rate, index) => (
-                                        <div key={index} className="flex items-center gap-3 bg-gray-800 p-3 rounded-lg border border-gray-600/50 hover:border-gray-500 transition-colors">
-                                            <img 
-                                                src={rate.avatar} 
-                                                alt={rate.user} 
-                                                className="w-8 h-8 rounded object-cover border border-gray-600"
-                                                onError={(e) => { e.target.src = 'https://www.wikidot.com/local--favicon/favicon.gif'; }}
-                                            />
-                                            <div className="flex-1 min-w-0">
-                                                <Link 
-                                                    href={`/authors?name=${encodeURIComponent(rate.user)}`} 
-                                                    className="text-sm font-medium text-indigo-400 hover:text-indigo-300 truncate block"
-                                                >
-                                                    {rate.user}
-                                                </Link>
-                                            </div>
-                                            <span className={`text-sm font-bold px-2 py-0.5 rounded ${rate.vote === '+1' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                                                {rate.vote === '+1' ? '+1' : '-1'}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center py-8 text-gray-500">
-                                    暂无评分数据，或该页面未被任何人评分。
-                                </div>
-                            )}
+                        <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                            <i className="fa-solid fa-code text-4xl mb-4 opacity-20"></i>
+                            <p className="text-lg font-medium">暂未开发</p>
+                            <p className="text-sm opacity-60">详细评分列表功能正在规划中</p>
                         </div>
                     )}
                 </div>
