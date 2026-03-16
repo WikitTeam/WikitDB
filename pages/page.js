@@ -6,7 +6,6 @@ const config = require('../wikitdb.config.js');
 
 const PageDetail = () => {
     const router = useRouter();
-    // 核心更改：读取参数变为 page
     const { site, page } = router.query;
     
     const [data, setData] = useState(null);
@@ -14,7 +13,6 @@ const PageDetail = () => {
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('源码');
 
-    // 仅在此处新增了 '评分' 标签
     const tabs = ['源码', '信息', '历史', '评分'];
 
     const fetchPageData = async () => {
@@ -23,7 +21,6 @@ const PageDetail = () => {
         setError(null);
         
         try {
-            // 请求后端接口使用 page 参数
             const apiUrl = `/api/page?site=${site}&page=${encodeURIComponent(page)}`;
             const res = await fetch(apiUrl);
             const result = await res.json();
@@ -113,6 +110,15 @@ const PageDetail = () => {
                                             {data.rating}
                                         </span>
                                     </div>
+                                    {/* 页面 ID 紧贴在页面评分右侧 */}
+                                    {data.pageId && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-gray-500">页面 ID:</span>
+                                            <span className="font-medium text-gray-300">
+                                                {data.pageId}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -224,7 +230,6 @@ const PageDetail = () => {
                         </div>
                     )}
 
-                    {/* 仅在此处新增了评分数据的渲染面板 */}
                     {activeTab === '评分' && (
                         <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-700">
                             {data.ratingTable && data.ratingTable.length > 0 ? (
