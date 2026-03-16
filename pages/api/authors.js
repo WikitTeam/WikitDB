@@ -28,7 +28,6 @@ export default async function handler(req, res) {
             fetch('https://wikit.unitreaty.org/apiv1/graphql', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // 直接在节点请求中加入 author_id
                 body: JSON.stringify({ 
                     query: `query { articles(author: "${queryName}", page: 1, pageSize: 500) { nodes { title wiki page rating created_at author_id } } }` 
                 }),
@@ -79,6 +78,17 @@ export default async function handler(req, res) {
                     userid = articlesData[0].author_id;
                 }
             }
+        }
+
+        // ==========================================
+        // 核心修复：用户查无此人校验
+        // 如果排名接口没数据，且名下一篇文章都没有，直接抛出 404 拦截
+        // ==========================================
+        if (!parsedFromRankApi && articlesData.length === 0) {
+            return res.status(404).json({ 
+                error: '未查找到该作者', 
+                details: '在数据库中未找到该用户的任何记录。请检查 Wikidot 用户名拼写是否正确。' 
+            });
         }
 
         // 兜底计算
