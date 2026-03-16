@@ -9,42 +9,56 @@ export default async function handler(req, res) {
 
     try {
         const queryName = name.trim();
+        const accountName = queryName.toLowerCase().replace(/_/g, '-').replace(/ /g, '-');
         
         let globalRank = '无记录';
         let totalRating = 0;
         let totalPages = 0;
         let siteStats = [];
         let parsedFromRankApi = false;
+        let userid = null;
+        let articlesData = [];
 
-        // 1. 核心修复：解析纯文本/HTML 格式的排名接口
-        const rankRes = await fetch(`https://wikit.unitreaty.org/wikidot/rank?user=${encodeURIComponent(queryName)}`, {
-            method: 'GET',
-            cache: 'no-store'
-        });
-        
-        if (rankRes.ok) {
-            const rankHtml = await rankRes.text();
-            // 将原生的 <br> 标签替换为换行符，方便按行解析
+        const fetchHeaders = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+        };
+
+        // 1. 新增功能：并行请求 Wikit 排名接口、GraphQL 文章列表和 Wikidot 用户资料页刮取 userid
+        const [rankRes, gqlRes, userInfoRes] = await Promise.allSettled([
+            fetch(`https://wikit.unitreaty.org/wikidot/rank?user=${encodeURIComponent(queryName)}`, {
+                method: 'GET',
+                cache: 'no-store'
+            }),
+            fetch('https://wikit.unitreaty.org/apiv1/graphql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                // 同时把单次拉取上限提高到 500，加快速度
+                body: JSON.stringify({ 
+                    query: `query { articles(author: "${queryName}", page: 1, pageSize: 500) { nodes { title wiki page rating created_at } } }` 
+                }),
+                cache: 'no-store'
+            }),
+            fetch(`http://www.wikidot.com/user:info/${accountName}`, { headers: fetchHeaders }) // 新增：并行刮取用户页
+        ]);
+
+        // 2. 解析排名接口文本
+        if (rankRes.status === 'fulfilled' && rankRes.value.ok) {
+            const rankHtml = await rankRes.value.text();
             const cleanHtml = rankHtml.replace(/<br\s*\/?>/gi, '\n');
             const $rank = cheerio.load(cleanHtml);
-            
-            // 按行分割文本并过滤空行
             const lines = $rank.text().split('\n').map(l => l.trim()).filter(l => l);
 
             if (lines.length > 0 && lines[0].includes('总排名')) {
                 parsedFromRankApi = true;
-                
-                // 解析第一行：全局数据
                 const globalRankMatch = lines[0].match(/总排名#(\d+)/);
                 if (globalRankMatch) globalRank = globalRankMatch[1];
-
                 const globalRatingMatch = lines[0].match(/总分(-?\d+)分/);
                 if (globalRatingMatch) totalRating = parseInt(globalRatingMatch[1], 10);
-
                 const globalPagesMatch = lines[0].match(/创建页面(?:总数)?(\d+)个/);
                 if (globalPagesMatch) totalPages = parseInt(globalPagesMatch[1], 10);
 
-                // 解析第二行及以后：各站点独立数据
                 for (let i = 1; i < lines.length; i++) {
                     const line = lines[i];
                     const siteMatch = line.match(/在(.*?)中的排名#(\d+)\s*总分(-?\d+)分\s*创建页面(?:总数)?(\d+)个/);
@@ -60,64 +74,46 @@ export default async function handler(req, res) {
             }
         }
 
-        // 2. 依然使用 GraphQL 获取具体的作品列表
-        const articlesQuery = `
-        query {
-          articles(author: "${queryName}", page: 1, pageSize: 500) {
-            nodes {
-              title
-              wiki
-              page
-              rating
-              created_at
-            }
-          }
-        }`;
-
-        const gqlRes = await fetch('https://wikit.unitreaty.org/apiv1/graphql', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: articlesQuery }),
-            cache: 'no-store'
-        });
-
-        let articlesData = [];
-        if (gqlRes.ok) {
-            const gqlJson = await gqlRes.json();
+        // 3. 解析 GraphQL 文章列表
+        if (gqlRes.status === 'fulfilled' && gqlRes.value.ok) {
+            const gqlJson = await gqlRes.value.json();
             if (!gqlJson.errors && gqlJson.data && gqlJson.data.articles) {
                 articlesData = gqlJson.data.articles.nodes || [];
             }
         }
 
-        // 3. 兜底逻辑：万一 REST 接口因为网络原因失效，用文章列表强行算
+        // 4. 新增：解析 Wikidot 用户资料页刮取 userid
+        if (userInfoRes.status === 'fulfilled' && userInfoRes.value.ok) {
+            const userInfoHtml = await userInfoRes.value.text();
+            // 核心刮取逻辑：利用正则从页面链接中精准提取底层的 userid
+            const useridMatch = userInfoHtml.match(/\/userInfo\/(\d+)/);
+            if (useridMatch) {
+                userid = useridMatch[1];
+            }
+        }
+
+        // 5. 整合与兜底
         if (!parsedFromRankApi) {
             let calcGlobalRating = 0;
             const siteStatsMap = {};
-
             articlesData.forEach(article => {
                 const r = article.rating || 0;
                 calcGlobalRating += r;
-                
                 const w = article.wiki;
-                if (!siteStatsMap[w]) {
-                    siteStatsMap[w] = { wiki: w, count: 0, rating: 0, rank: '无记录' };
-                }
+                if (!siteStatsMap[w]) siteStatsMap[w] = { wiki: w, count: 0, rating: 0, rank: '无记录' };
                 siteStatsMap[w].count += 1;
                 siteStatsMap[w].rating += r;
             });
-
             totalPages = articlesData.length;
             totalRating = calcGlobalRating;
             siteStats = Object.values(siteStatsMap).sort((a, b) => b.count - a.count);
         }
 
         let averageRating = 0;
-        if (totalPages > 0) {
-            averageRating = (totalRating / totalPages).toFixed(1);
-        }
+        if (totalPages > 0) averageRating = (totalRating / totalPages).toFixed(1);
 
-        const accountName = encodeURIComponent(queryName.toLowerCase().replace(/_/g, '-').replace(/ /g, '-'));
-        const avatarUrl = `https://www.wikidot.com/avatar.php?account=${accountName}`;
+        // 核心修复：根据你提供的 userid API 构建头像 URL，并使用当前 timestamp 绕过缓存
+        const avatarUrl = userid ? `http://www.wikidot.com/avatar.php?userid=${userid}&timestamp=${Date.now()}` : `https://www.wikidot.com/avatar.php?account=${accountName}`;
 
         const authorData = {
             name: queryName,
