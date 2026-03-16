@@ -50,15 +50,12 @@ export default async function handler(req, res) {
             title = decodeURIComponent(urlParts[urlParts.length - 1] || '未命名页面').replace(/-/g, ' ');
         }
 
-        const contentHtml = $('#page-content').html() || '<p class="text-gray-400">无法提取到正文区域 (#page-content)。</p>';
-
         const tags = [];
         $('.page-tags a').each((i, el) => {
             const t = $(el).text().trim();
             if(t && !t.startsWith('_')) tags.push(t);
         });
 
-        // 获取创建者名字和头像
         let creatorName = '未知';
         let creatorAvatar = null;
         const printusers = $('.printuser');
@@ -70,14 +67,11 @@ export default async function handler(req, res) {
         if (!creatorName || creatorName === '未知') {
             creatorName = $('#page-info a[href*="/user:info/"]').first().text().trim() || '未知';
         }
-        // 处理 Wikidot 相对路径头像
         if (creatorAvatar && !creatorAvatar.startsWith('http')) {
             creatorAvatar = `https://www.wikidot.com${creatorAvatar.startsWith('/') ? '' : '/'}${creatorAvatar}`;
         }
 
-        // 获取评价表评分
         let rating = $('.rate-points').first().text().trim() || 'N/A';
-
         let lastUpdated = $('#page-info .odate').last().text().trim() || $('.odate').last().text().trim() || '未知';
 
         let pageId = null;
@@ -165,7 +159,6 @@ export default async function handler(req, res) {
             siteImg: wikiConfig.ImgURL,
             originalUrl: secureUrl,
             title: title,
-            content: contentHtml,
             tags: tags,
             creatorName: creatorName,
             creatorAvatar: creatorAvatar,
