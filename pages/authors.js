@@ -43,7 +43,7 @@ const AuthorProfile = () => {
                 throw new Error(result.details || result.error || '请求失败');
             }
 
-            if (result.pages?.length > 0) {
+            if (result.pages && result.pages.length > 0) {
                 result.pages.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
             }
 
@@ -94,22 +94,22 @@ const AuthorProfile = () => {
         }
     }
 
-    // 核心更新：使用 config.WIKIT_ID 将排行榜名称与数据库简写桥接起来
+    // 核心修复：无死角匹配逻辑
     const displayedPages = data && data.pages ? (
         filterSite === 'all' 
             ? data.pages 
             : data.pages.filter(page => {
-                // 1. 根据下拉框的选项(可能是中文，也可能是简写)，找到对应的配置文件
                 const targetSiteConfig = config.SUPPORT_WIKI.find(w => 
                     w.NAME === filterSite || w.WIKIT_ID === filterSite
                 );
                 
-                // 2. 如果找到了配置，并且配置了 WIKIT_ID，就强制使用 WIKIT_ID(简写) 去匹配文章的 page.wiki
-                if (targetSiteConfig && targetSiteConfig.WIKIT_ID) {
-                    return page.wiki === targetSiteConfig.WIKIT_ID;
+                if (targetSiteConfig) {
+                    // 不管文章的 wiki 字段是简写、中文名还是包含在 URL 里，只要中一个就算匹配成功
+                    return page.wiki === targetSiteConfig.WIKIT_ID || 
+                           page.wiki === targetSiteConfig.NAME || 
+                           (targetSiteConfig.URL && targetSiteConfig.URL.includes(page.wiki));
                 }
                 
-                // 3. 兜底匹配
                 return page.wiki === filterSite;
             })
     ) : [];
@@ -178,12 +178,11 @@ const AuthorProfile = () => {
                                 平均评分为 <span className="font-semibold text-white">{data.averageRating > 0 ? `+${data.averageRating}` : data.averageRating}</span>。
                             </p>
 
-                            {data.siteStats?.length > 0 && (
+                            {data.siteStats && data.siteStats.length > 0 && (
                                 <>
                                     <h4 className="text-lg font-medium text-white mb-3">所属站点数据分布：</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                         {data.siteStats.map((site, index) => {
-                                            // 概览卡片也使用 WIKIT_ID 进行映射匹配
                                             const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
                                             const siteName = siteConfig ? siteConfig.NAME : site.wiki;
                                             return (
@@ -213,7 +212,7 @@ const AuthorProfile = () => {
                                     所有发布页面 <span className="text-sm font-normal text-gray-400">(按创建时间倒序)</span>
                                 </h3>
                                 
-                                {data.siteStats?.length > 0 && (
+                                {data.siteStats && data.siteStats.length > 0 && (
                                     <select
                                         value={filterSite}
                                         onChange={(e) => setFilterSite(e.target.value)}
@@ -221,7 +220,6 @@ const AuthorProfile = () => {
                                     >
                                         <option value="all">全站总览 (All Sites)</option>
                                         {data.siteStats.map((site, index) => {
-                                            // 下拉框文本也使用映射
                                             const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
                                             const siteName = siteConfig ? siteConfig.NAME : site.wiki;
                                             return (
@@ -237,7 +235,6 @@ const AuthorProfile = () => {
                             {displayedPages.length > 0 ? (
                                 <div className="space-y-4">
                                     {displayedPages.map((page, index) => {
-                                        // 列表项匹配也加入 WIKIT_ID 支持
                                         const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === page.wiki || w.URL.includes(page.wiki));
                                         const siteParam = siteConfig ? siteConfig.PARAM : page.wiki;
                                         const dateStr = page.created_at ? new Date(page.created_at).toLocaleDateString('zh-CN') : '未知时间';
@@ -321,7 +318,7 @@ const AuthorProfile = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {currentRankingList?.length > 0 ? (
+                                        {currentRankingList && currentRankingList.length > 0 ? (
                                             currentRankingList.map((author, index) => (
                                                 <tr key={index} className="border-b border-gray-700/50 hover:bg-gray-700/20 transition-colors">
                                                     <td className="p-4">
