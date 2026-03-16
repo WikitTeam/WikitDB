@@ -44,8 +44,8 @@ export default async function handler(req, res) {
         let pageTitle = "全站页面索引";
 
         try {
-            // 使用安全上限 50，老老实实顺序翻页，防止并发把接口打挂
-            const pageSize = 50;
+            // 根据 Kakushi 的建议，将安全上限调整为 100
+            const pageSize = 100;
             let currentPage = 1;
             let hasNextPage = true;
 
