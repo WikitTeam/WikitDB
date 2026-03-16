@@ -10,6 +10,7 @@ export default async function handler(req, res) {
 
     const cleanUrl = url.split('|')[0].split('#')[0].trim();
     const secureUrl = cleanUrl.replace(/^http:\/\//i, 'https://');
+    const pageName = cleanUrl.split('/').pop().toLowerCase();
 
     const wikiConfig = config.SUPPORT_WIKI.find(w => w.PARAM === site);
     if (!wikiConfig) {
@@ -23,56 +24,86 @@ export default async function handler(req, res) {
             'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
         };
 
-        const response = await fetch(secureUrl, { 
-            headers: fetchHeaders,
-            cache: 'no-store'
-        });
-        
-        if (response.status === 404) {
+        // 1. 并发请求 GraphQL 和 原站 HTML
+        const [gqlResponse, htmlResponse] = await Promise.allSettled([
+            fetch('https://wikit.unitreaty.org/apiv1/graphql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query: `query { article(wiki: "${site}", page: "${pageName}") { title rating author tags created_at lastmod } }`
+                }),
+                cache: 'no-store'
+            }),
+            fetch(secureUrl, { 
+                headers: fetchHeaders,
+                cache: 'no-store'
+            })
+        ]);
+
+        // 2. 解析 GraphQL 数据
+        let gqlData = null;
+        if (gqlResponse.status === 'fulfilled' && gqlResponse.value.ok) {
+            try {
+                const gqlJson = await gqlResponse.value.json();
+                if (gqlJson.data && gqlJson.data.article) {
+                    gqlData = gqlJson.data.article;
+                }
+            } catch (e) {}
+        }
+
+        // 3. 解析原站 HTML 数据与校验
+        if (htmlResponse.status === 'fulfilled' && htmlResponse.value.status === 404) {
             throw new Error(`404: 原站点中该页面不存在 (可能是死链或已被原作者删除)`);
         }
-        if (!response.ok) {
-            throw new Error(`HTTP 状态码异常: ${response.status}`);
+        if (htmlResponse.status === 'rejected' || !htmlResponse.value.ok) {
+            throw new Error(`HTTP 状态码异常: ${htmlResponse.value?.status || '网络请求失败'}`);
         }
         
-        const html = await response.text();
+        const html = await htmlResponse.value.text();
         const $ = cheerio.load(html);
 
-        let title = $('#page-title').text().trim();
+        // 4. 数据合并与覆盖：优先使用 GraphQL，DOM 提取作为兜底
+        let title = gqlData?.title;
         if (!title) {
-            title = $('title').text().trim();
-            if (title.includes('-')) {
-                title = title.split('-')[0].trim();
-            }
-        }
-        if (!title || title.startsWith('http')) {
-            const urlParts = secureUrl.split('/');
-            title = decodeURIComponent(urlParts[urlParts.length - 1] || '未命名页面').replace(/-/g, ' ');
+            title = $('#page-title').text().trim() || $('title').text().trim() || decodeURIComponent(pageName).replace(/-/g, ' ');
+            if (title.includes(' - ')) title = title.split(' - ')[0].trim();
         }
 
-        const tags = [];
-        $('.page-tags a').each((i, el) => {
-            const t = $(el).text().trim();
-            if(t && !t.startsWith('_')) tags.push(t);
-        });
+        let tags = gqlData?.tags;
+        if (!tags || tags.length === 0) {
+            tags = [];
+            $('.page-tags a').each((i, el) => {
+                const t = $(el).text().trim();
+                if(t && !t.startsWith('_')) tags.push(t);
+            });
+        }
 
-        let creatorName = '未知';
+        let creatorName = gqlData?.author || $('.printuser').last().text().trim() || $('#page-info a[href*="/user:info/"]').first().text().trim() || '未知';
+        
+        let rating = 'N/A';
+        if (gqlData && gqlData.rating !== undefined) {
+            rating = gqlData.rating > 0 ? `+${gqlData.rating}` : gqlData.rating.toString();
+        } else {
+            rating = $('.rate-points').first().text().trim() || 'N/A';
+        }
+
+        let lastUpdated = gqlData?.lastmod;
+        if (!lastUpdated) {
+            lastUpdated = $('#page-info .odate').last().text().trim() || $('.odate').last().text().trim() || '未知';
+        } else {
+            // 将 GraphQL 的 ISO 时间格式化为可读字符串
+            lastUpdated = new Date(lastUpdated).toLocaleString('zh-CN', { hour12: false });
+        }
+
+        // 5. 提取单独需要 DOM 的数据：头像与 pageId
         let creatorAvatar = null;
         const printusers = $('.printuser');
         if (printusers.length > 0) {
-            const lastUser = printusers.last();
-            creatorName = lastUser.text().trim();
-            creatorAvatar = lastUser.find('img').attr('src');
-        }
-        if (!creatorName || creatorName === '未知') {
-            creatorName = $('#page-info a[href*="/user:info/"]').first().text().trim() || '未知';
+            creatorAvatar = printusers.last().find('img').attr('src');
         }
         if (creatorAvatar && !creatorAvatar.startsWith('http')) {
             creatorAvatar = `https://www.wikidot.com${creatorAvatar.startsWith('/') ? '' : '/'}${creatorAvatar}`;
         }
-
-        let rating = $('.rate-points').first().text().trim() || 'N/A';
-        let lastUpdated = $('#page-info .odate').last().text().trim() || $('.odate').last().text().trim() || '未知';
 
         let pageId = null;
         const idMatch = html.match(/pageId\s*[:=]\s*['"]?(\d+)['"]?/i) || html.match(/page_id\s*[:=]\s*['"]?(\d+)['"]?/i);
@@ -83,6 +114,7 @@ export default async function handler(req, res) {
         let sourceCode = '源码抓取失败：未能在原站网页中解析到 pageId。';
         let historyHtml = '<div class="text-gray-500">历史记录抓取失败：未能在原站网页中解析到 pageId。</div>';
 
+        // 6. 底层 AJAX 抓取源码和历史
         if (pageId) {
             const origin = new URL(secureUrl).origin;
             const ajaxUrl = `${origin}/ajax-module-connector.php`;
