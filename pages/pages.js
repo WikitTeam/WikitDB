@@ -35,15 +35,19 @@ const Pages = () => {
 
     useEffect(() => {
         if (selectedSite) {
-            setSearchQuery(''); // 切换站点时清空搜索框
+            setSearchQuery('');
             fetchCrawlerData(selectedSite);
         }
     }, [selectedSite]);
 
-    // 实时过滤搜索结果
     const filteredLinks = data?.links?.filter(link => 
         link.text.toLowerCase().includes(searchQuery.toLowerCase())
     ) || [];
+
+    // 核心提取：无论原站返回的 href 是什么格式，统一剥离出最终的 page 页面名
+    const getPageName = (href) => {
+        return href.split('|')[0].split('#')[0].replace(/\/$/, '').split('/').pop();
+    };
 
     return (
         <>
@@ -117,7 +121,7 @@ const Pages = () => {
                                             <li key={index} className="text-gray-400 flex items-baseline gap-2 truncate">
                                                 <span className="text-gray-600 text-xs w-8 shrink-0">{index + 1}.</span>
                                                 <Link 
-                                                    href={`/page?site=${selectedSite}&url=${encodeURIComponent(link.href)}`}
+                                                    href={`/page?site=${selectedSite}&page=${encodeURIComponent(getPageName(link.href))}`}
                                                     className="hover:text-indigo-400 text-indigo-300 transition-colors truncate"
                                                     title={link.text}
                                                 >
