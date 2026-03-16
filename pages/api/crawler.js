@@ -9,8 +9,15 @@ export default async function handler(req, res) {
     const wikiConfig = config.SUPPORT_WIKI.find(w => w.PARAM === site);
     if (!wikiConfig) return res.status(404).json({ error: '未找到该站点配置' });
 
-    // 核心修复：从配置的 URL 提取真实的 Wiki 名称 (例如 if-backrooms) 喂给 Wikit
-    const actualWikiName = wikiConfig.URL.replace(/^https?:\/\//i, '').split('.')[0];
+    // 强化提取逻辑，剥离协议头和可能的 www. 前缀，确保传给 GraphQL 的是绝对干净的站点名
+    let actualWikiName = '';
+    try {
+        const urlObj = new URL(wikiConfig.URL);
+        actualWikiName = urlObj.hostname.replace(/^www\./i, '').split('.')[0];
+    } catch (e) {
+        actualWikiName = wikiConfig.URL.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('.')[0];
+    }
+
     const baseUrl = wikiConfig.URL.replace(/\/$/, '');
 
     try {
@@ -25,47 +32,71 @@ export default async function handler(req, res) {
         let pageTitle = "全站页面索引";
 
         try {
-            let currentPage = 1;
-            let hasNextPage = true;
+            const pageSize = 150;
+            const buildQuery = (page) => JSON.stringify({
+                query: `query { articles(wiki: ["${actualWikiName}"], page: ${page}, pageSize: ${pageSize}) { nodes { title url page } pageInfo { total hasNextPage } } }`
+            });
 
-            while (hasNextPage) {
-                const gqlRes = await fetch('https://wikit.unitreaty.org/apiv1/graphql', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        // 使用真实的 actualWikiName 
-                        query: `query { articles(wiki: ["${actualWikiName}"], page: ${currentPage}, pageSize: 500) { nodes { title url page } pageInfo { hasNextPage } } }`
-                    }),
-                    cache: 'no-store'
-                });
+            // 先请求第一页，探明总数据量
+            const firstRes = await fetch('https://wikit.unitreaty.org/apiv1/graphql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: buildQuery(1),
+                cache: 'no-store'
+            });
 
-                if (gqlRes.ok) {
-                    const gqlJson = await gqlRes.json();
-                    const articlesData = gqlJson.data?.articles;
-                    
-                    if (articlesData && articlesData.nodes && articlesData.nodes.length > 0) {
-                        articlesData.nodes.forEach(node => {
-                            const fullHref = node.url || `${baseUrl}/${node.page}`;
-                            const text = node.title || node.page;
-                            
-                            if (fullHref.startsWith(baseUrl) && !fullHref.includes('/system:') && !fullHref.includes('/admin:') && !fullHref.includes('/component:') && !fullHref.includes('user:info')) {
-                                if (!seen.has(fullHref)) {
-                                    seen.add(fullHref);
-                                    links.push({ text: text, href: fullHref });
-                                }
+            if (firstRes.ok) {
+                const firstJson = await firstRes.json();
+                const articlesData = firstJson.data?.articles;
+
+                const processNodes = (nodes) => {
+                    if (!nodes) return;
+                    nodes.forEach(node => {
+                        const fullHref = node.url || `${baseUrl}/${node.page}`;
+                        const text = node.title || node.page;
+                        
+                        if (fullHref.startsWith(baseUrl) && !fullHref.includes('/system:') && !fullHref.includes('/admin:') && !fullHref.includes('/component:') && !fullHref.includes('user:info')) {
+                            if (!seen.has(fullHref)) {
+                                seen.add(fullHref);
+                                links.push({ text: text, href: fullHref });
                             }
-                        });
-                        hasNextPage = articlesData.pageInfo?.hasNextPage || false;
-                        currentPage++;
-                    } else {
-                        hasNextPage = false;
+                        }
+                    });
+                };
+
+                // 处理第一页数据
+                processNodes(articlesData?.nodes);
+
+                const totalItems = articlesData?.pageInfo?.total || 0;
+                const totalPages = Math.ceil(totalItems / pageSize);
+
+                // 如果存在多页，启用 Promise.all 并发请求剩下的所有页面
+                if (totalPages > 1) {
+                    const fetchPromises = [];
+                    for (let i = 2; i <= totalPages; i++) {
+                        fetchPromises.push(
+                            fetch('https://wikit.unitreaty.org/apiv1/graphql', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: buildQuery(i),
+                                cache: 'no-store'
+                            }).then(res => res.json()).catch(() => null)
+                        );
                     }
-                } else {
-                    hasNextPage = false;
+
+                    const results = await Promise.all(fetchPromises);
+                    results.forEach(json => {
+                        if (json && json.data && json.data.articles) {
+                            processNodes(json.data.articles.nodes);
+                        }
+                    });
                 }
             }
-        } catch (e) {}
+        } catch (e) {
+            // GraphQL 请求彻底失败时，进入原生爬取兜底
+        }
 
+        // 兜底 1：调用原站系统列表页
         if (links.length === 0) {
             try {
                 const listAllUrl = `${baseUrl}/system:list-all-pages`;
@@ -94,6 +125,7 @@ export default async function handler(req, res) {
             } catch (e) {}
         }
 
+        // 兜底 2：提取首页
         if (links.length === 0) {
             try {
                 const homeRes = await fetch(baseUrl, { headers: fetchHeaders });
