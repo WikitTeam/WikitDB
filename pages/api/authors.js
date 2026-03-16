@@ -19,14 +19,8 @@ export default async function handler(req, res) {
         let userid = null;
         let articlesData = [];
 
-        const fetchHeaders = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
-        };
-
-        // 1. 新增功能：并行请求 Wikit 排名接口、GraphQL 文章列表和 Wikidot 用户资料页刮取 userid
-        const [rankRes, gqlRes, userInfoRes] = await Promise.allSettled([
+        // 发起并发请求
+        const [rankRes, gqlRes] = await Promise.allSettled([
             fetch(`https://wikit.unitreaty.org/wikidot/rank?user=${encodeURIComponent(queryName)}`, {
                 method: 'GET',
                 cache: 'no-store'
@@ -34,16 +28,15 @@ export default async function handler(req, res) {
             fetch('https://wikit.unitreaty.org/apiv1/graphql', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // 同时把单次拉取上限提高到 500，加快速度
+                // 直接在节点请求中加入 author_id
                 body: JSON.stringify({ 
-                    query: `query { articles(author: "${queryName}", page: 1, pageSize: 500) { nodes { title wiki page rating created_at } } }` 
+                    query: `query { articles(author: "${queryName}", page: 1, pageSize: 500) { nodes { title wiki page rating created_at author_id } } }` 
                 }),
                 cache: 'no-store'
-            }),
-            fetch(`http://www.wikidot.com/user:info/${accountName}`, { headers: fetchHeaders }) // 新增：并行刮取用户页
+            })
         ]);
 
-        // 2. 解析排名接口文本
+        // 解析排名
         if (rankRes.status === 'fulfilled' && rankRes.value.ok) {
             const rankHtml = await rankRes.value.text();
             const cleanHtml = rankHtml.replace(/<br\s*\/?>/gi, '\n');
@@ -54,8 +47,10 @@ export default async function handler(req, res) {
                 parsedFromRankApi = true;
                 const globalRankMatch = lines[0].match(/总排名#(\d+)/);
                 if (globalRankMatch) globalRank = globalRankMatch[1];
+                
                 const globalRatingMatch = lines[0].match(/总分(-?\d+)分/);
                 if (globalRatingMatch) totalRating = parseInt(globalRatingMatch[1], 10);
+                
                 const globalPagesMatch = lines[0].match(/创建页面(?:总数)?(\d+)个/);
                 if (globalPagesMatch) totalPages = parseInt(globalPagesMatch[1], 10);
 
@@ -74,31 +69,26 @@ export default async function handler(req, res) {
             }
         }
 
-        // 3. 解析 GraphQL 文章列表
+        // 解析文章并提取作者 ID
         if (gqlRes.status === 'fulfilled' && gqlRes.value.ok) {
             const gqlJson = await gqlRes.value.json();
             if (!gqlJson.errors && gqlJson.data && gqlJson.data.articles) {
                 articlesData = gqlJson.data.articles.nodes || [];
+                // 如果有文章数据，直接从第一篇里抽出 userid
+                if (articlesData.length > 0 && articlesData[0].author_id) {
+                    userid = articlesData[0].author_id;
+                }
             }
         }
 
-        // 4. 新增：解析 Wikidot 用户资料页刮取 userid
-        if (userInfoRes.status === 'fulfilled' && userInfoRes.value.ok) {
-            const userInfoHtml = await userInfoRes.value.text();
-            // 核心刮取逻辑：利用正则从页面链接中精准提取底层的 userid
-            const useridMatch = userInfoHtml.match(/\/userInfo\/(\d+)/);
-            if (useridMatch) {
-                userid = useridMatch[1];
-            }
-        }
-
-        // 5. 整合与兜底
+        // 兜底计算
         if (!parsedFromRankApi) {
             let calcGlobalRating = 0;
             const siteStatsMap = {};
             articlesData.forEach(article => {
                 const r = article.rating || 0;
                 calcGlobalRating += r;
+                
                 const w = article.wiki;
                 if (!siteStatsMap[w]) siteStatsMap[w] = { wiki: w, count: 0, rating: 0, rank: '无记录' };
                 siteStatsMap[w].count += 1;
@@ -112,7 +102,7 @@ export default async function handler(req, res) {
         let averageRating = 0;
         if (totalPages > 0) averageRating = (totalRating / totalPages).toFixed(1);
 
-        // 核心修复：根据你提供的 userid API 构建头像 URL，并使用当前 timestamp 绕过缓存
+        // 构造头像链接
         const avatarUrl = userid ? `http://www.wikidot.com/avatar.php?userid=${userid}&timestamp=${Date.now()}` : `https://www.wikidot.com/avatar.php?account=${accountName}`;
 
         const authorData = {
