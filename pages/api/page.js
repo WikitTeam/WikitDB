@@ -99,7 +99,7 @@ export default async function handler(req, res) {
             creatorAvatar = `https://www.wikidot.com${creatorAvatar.startsWith('/') ? '' : '/'}${creatorAvatar}`;
         }
 
-        // 核心修复：Wikit 历史接口的双引擎兜底逻辑
+        // 核心修复 1：Wikit 历史接口报错拦截
         let historyHtml = '';
         let wikitHistoryFailed = false; 
 
@@ -115,14 +115,14 @@ export default async function handler(req, res) {
                 const histText = await histRes.text();
                 try {
                     const histJson = JSON.parse(histText);
-                    // 如果 Wikit 返回了 empty_history_body 报错，或者返回了纯 JSON 数据（没有头像）
-                    // 标记为失败，交由底层的原生 Wikidot AJAX 接口进行带头像的 UI 兜底
+                    // 遇到图一的 JSON 报错，拦截并触发兜底
                     if (histJson.error || Array.isArray(histJson)) {
                         wikitHistoryFailed = true;
                     } else {
                         historyHtml = histJson.body || histJson.html || histText;
                     }
                 } catch (e) {
+                    // 解析 JSON 失败说明返回的是正确的 HTML 表格
                     if (histText.includes('<html') || histText.includes('<table')) {
                         const $hist = cheerio.load(histText);
                         historyHtml = $hist('table.page-history').length ? $hist('table.page-history').parent().html() : $hist('body').html() || histText;
@@ -168,7 +168,7 @@ export default async function handler(req, res) {
                 })
             ];
 
-            // 只有当 Wikit 接口失败或无头像时，才启动底层的历史记录抓取引擎
+            // 如果 Wikit 接口报错，启动原生接口兜底抓取历史记录
             if (wikitHistoryFailed) {
                 fetchPromises.push(
                     fetch(ajaxUrl, {
@@ -205,7 +205,6 @@ export default async function handler(req, res) {
                 sourceCode = `请求源码网络错误，可能被原站拦截`;
             }
 
-            // 原生历史记录兜底逻辑生效
             if (wikitHistoryFailed && results[1]) {
                 const histRes = results[1];
                 if (histRes.status === 'fulfilled' && histRes.value.ok) {
@@ -224,7 +223,19 @@ export default async function handler(req, res) {
                 }
             }
         } else if (wikitHistoryFailed) {
-            historyHtml = '<div class="text-gray-500">历史记录抓取失败：Wikit 接口无数据，且未能在原站网页中解析到 pageId 进行兜底抓取。</div>';
+            historyHtml = '<div class="text-gray-500">历史记录抓取失败：Wikit 接口无数据，且未能在原站网页中解析到 pageId 进行兜底。</div>';
+        }
+
+        // 核心修复 2：暴力清洗历史记录中的头像样式，解决图三的巨大方形头像
+        if (historyHtml && !historyHtml.startsWith('{')) {
+            const $hist = cheerio.load(historyHtml, null, false);
+            $hist('img').each((i, el) => {
+                const $img = $hist(el);
+                $img.removeAttr('style').removeAttr('width').removeAttr('height').removeAttr('class');
+                // 直接注入行内 CSS，绝对优先级，强制 20px 小圆圈居中对齐
+                $img.attr('style', 'width: 20px; height: 20px; border-radius: 50%; display: inline-block; object-fit: cover; margin-right: 6px; vertical-align: middle;');
+            });
+            historyHtml = $hist.html();
         }
 
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
