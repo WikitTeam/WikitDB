@@ -33,7 +33,7 @@ const AuthorProfile = () => {
         setLoading(true);
         setError(null);
         setData(null);
-        setFilterSite('all');
+        setFilterSite('all'); // 每次搜新作者，下拉框默认重置为全站
 
         try {
             const res = await fetch(`/api/authors?name=${encodeURIComponent(authorName)}`);
@@ -94,27 +94,27 @@ const AuthorProfile = () => {
         }
     }
 
-    // 核心修复：智能桥接过滤逻辑
+    // ==========================================
+    // 核心过滤逻辑：落实你的 WIKIT_ID 桥接检测方案
+    // ==========================================
     const displayedPages = data && data.pages ? (
         filterSite === 'all' 
             ? data.pages 
             : data.pages.filter(page => {
-                // 1. 动态直通：应对没被配置收录的外站（两边都是简写，直接匹配通过）
-                if (page.wiki === filterSite) return true;
-                
-                // 2. 桥接翻译：如果下拉框选的是中文名，去 config 里找它的 WIKIT_ID(简写)
-                const siteConfig = config.SUPPORT_WIKI.find(w => 
-                    w.NAME === filterSite || w.WIKIT_ID === filterSite
+                // filterSite 是下拉框里选中的站名 (比如 "The Backrooms-IF")
+                // 我们去 config 里找：哪个站点的 RANKING_NAME 或 NAME 是这个？
+                const targetSiteConfig = config.SUPPORT_WIKI.find(w => 
+                    w.RANKING_NAME === filterSite || w.NAME === filterSite || w.WIKIT_ID === filterSite
                 );
                 
-                // 3. 翻译验证：用找到的简写(WIKIT_ID)去验证文章的标识(page.wiki)
-                if (siteConfig) {
-                    return page.wiki === siteConfig.WIKIT_ID || 
-                           page.wiki === siteConfig.NAME || 
-                           (siteConfig.URL && siteConfig.URL.includes(page.wiki));
+                // 如果在 config 里找到了对应的站点，且你配置了 WIKIT_ID
+                if (targetSiteConfig && targetSiteConfig.WIKIT_ID) {
+                    // 正如你所说：直接检测返回的文章 wiki 参数是否与配置的 WIKIT_ID 相同！
+                    return page.wiki === targetSiteConfig.WIKIT_ID;
                 }
                 
-                return false;
+                // 兜底（未被收录在 config 里的外站，强行比较）
+                return page.wiki === filterSite;
             })
     ) : [];
 
@@ -187,7 +187,8 @@ const AuthorProfile = () => {
                                     <h4 className="text-lg font-medium text-white mb-3">所属站点数据分布：</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                         {data.siteStats.map((site, index) => {
-                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
+                                            // 利用 RANKING_NAME 把排行榜的站点名称替换为你配置的好看名称
+                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.RANKING_NAME === site.wiki || w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
                                             const siteName = siteConfig ? siteConfig.NAME : site.wiki;
                                             return (
                                                 <div key={index} className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
@@ -224,7 +225,7 @@ const AuthorProfile = () => {
                                     >
                                         <option value="all">全站总览 (All Sites)</option>
                                         {data.siteStats.map((site, index) => {
-                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
+                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.RANKING_NAME === site.wiki || w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
                                             const siteName = siteConfig ? siteConfig.NAME : site.wiki;
                                             return (
                                                 <option key={index} value={site.wiki}>
@@ -239,6 +240,7 @@ const AuthorProfile = () => {
                             {displayedPages.length > 0 ? (
                                 <div className="space-y-4">
                                     {displayedPages.map((page, index) => {
+                                        // 匹配列表渲染：也利用 WIKIT_ID 进行桥接找配置
                                         const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === page.wiki || w.URL.includes(page.wiki));
                                         const siteParam = siteConfig ? siteConfig.PARAM : page.wiki;
                                         const dateStr = page.created_at ? new Date(page.created_at).toLocaleDateString('zh-CN') : '未知时间';
