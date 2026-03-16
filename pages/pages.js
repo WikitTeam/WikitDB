@@ -9,20 +9,23 @@ const Pages = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    
+    // 控制当前页码
+    const [page, setPage] = useState(1);
 
-    // 每次切换站点时，清空搜索框并默认拉取该站点的最新文章
     useEffect(() => {
         setSearchQuery('');
-        executeSearch('');
+        setPage(1);
+        executeSearch('', 1);
     }, [selectedSite]);
 
-    const executeSearch = async (queryToSearch = searchQuery) => {
+    const executeSearch = async (queryToSearch = searchQuery, pageNum = page) => {
         setLoading(true);
         setError(null);
-        setData(null);
         
         try {
-            const apiUrl = `/api/search?site=${selectedSite}&q=${encodeURIComponent(queryToSearch)}`;
+            // 将页码 p 传给后端
+            const apiUrl = `/api/search?site=${selectedSite}&q=${encodeURIComponent(queryToSearch)}&p=${pageNum}`;
             const res = await fetch(apiUrl);
             const result = await res.json();
             
@@ -31,6 +34,7 @@ const Pages = () => {
             }
             
             setData(result);
+            setPage(result.currentPage);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -40,7 +44,16 @@ const Pages = () => {
 
     const handleSearchSubmit = (e) => {
         e.preventDefault();
-        executeSearch();
+        setPage(1);
+        executeSearch(searchQuery, 1);
+    };
+
+    const handlePageChange = (newPage) => {
+        if (newPage < 1 || (data && newPage > data.totalPages)) return;
+        setPage(newPage);
+        executeSearch(searchQuery, newPage);
+        // 翻页后回到顶部
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     return (
@@ -101,27 +114,26 @@ const Pages = () => {
                         <div>
                             <div className="mb-4 text-gray-400 text-sm flex justify-between items-center">
                                 <span>来源站点: {data.siteName}</span>
-                                <span>显示 {data.results.length} 条检索结果</span>
+                                <span>共找到 {data.totalCount} 条记录</span>
                             </div>
                             
                             {data.results.length > 0 ? (
                                 <div className="space-y-3">
-                                    {data.results.map((page, index) => {
-                                        const dateStr = page.created_at ? new Date(page.created_at).toLocaleDateString('zh-CN') : '未知时间';
+                                    {data.results.map((pageData, index) => {
+                                        const dateStr = pageData.created_at ? new Date(pageData.created_at).toLocaleDateString('zh-CN') : '未知时间';
                                         
                                         return (
                                             <div key={index} className="bg-gray-900/40 p-4 rounded-lg border border-gray-700/50 hover:border-gray-500 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                                 <div>
                                                     <Link 
-                                                        // 按照要求，将目标链接修改为本站的内部结构
-                                                        href={`/page?site=${selectedSite}&page=${encodeURIComponent(page.page)}`}
+                                                        href={`/page?site=${selectedSite}&page=${encodeURIComponent(pageData.page)}`}
                                                         className="text-lg font-medium text-indigo-400 hover:text-indigo-300 hover:underline"
                                                     >
-                                                        {page.title || page.page}
+                                                        {pageData.title || pageData.page}
                                                     </Link>
                                                     <div className="text-xs text-gray-500 mt-1.5 flex gap-4">
-                                                        <span>系统名: {page.page}</span>
-                                                        <span>评分: <span className={page.rating > 0 ? 'text-green-400' : 'text-gray-400'}>{page.rating > 0 ? `+${page.rating}` : (page.rating || 0)}</span></span>
+                                                        <span>系统名: {pageData.page}</span>
+                                                        <span>评分: <span className={pageData.rating > 0 ? 'text-green-400' : 'text-gray-400'}>{pageData.rating > 0 ? `+${pageData.rating}` : (pageData.rating || 0)}</span></span>
                                                     </div>
                                                 </div>
                                                 <div className="text-sm text-gray-500 shrink-0">
@@ -130,6 +142,29 @@ const Pages = () => {
                                             </div>
                                         );
                                     })}
+
+                                    {/* 翻页组件 */}
+                                    {data.totalPages > 1 && (
+                                        <div className="flex justify-center items-center gap-4 mt-8 pt-4 border-t border-gray-700/50">
+                                            <button
+                                                onClick={() => handlePageChange(data.currentPage - 1)}
+                                                disabled={data.currentPage === 1}
+                                                className="px-4 py-2 bg-gray-800 text-gray-300 rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                                            >
+                                                上一页
+                                            </button>
+                                            <span className="text-gray-400 text-sm">
+                                                第 {data.currentPage} / {data.totalPages} 页
+                                            </span>
+                                            <button
+                                                onClick={() => handlePageChange(data.currentPage + 1)}
+                                                disabled={data.currentPage === data.totalPages}
+                                                className="px-4 py-2 bg-gray-800 text-gray-300 rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                                            >
+                                                下一页
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             ) : (
                                 <div className="text-center py-16 border border-dashed border-gray-700 rounded-lg bg-gray-900/20">
