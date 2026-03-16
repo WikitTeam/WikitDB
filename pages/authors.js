@@ -80,7 +80,6 @@ const AuthorProfile = () => {
         if (searchInput.trim()) {
             router.push(`/authors?name=${encodeURIComponent(searchInput.trim())}`, undefined, { shallow: true });
         } else {
-            // 如果清空搜索框回车，则返回排行榜
             router.push(`/authors`, undefined, { shallow: true });
         }
     };
@@ -95,10 +94,24 @@ const AuthorProfile = () => {
         }
     }
 
+    // 核心更新：使用 config.WIKIT_ID 将排行榜名称与数据库简写桥接起来
     const displayedPages = data && data.pages ? (
         filterSite === 'all' 
             ? data.pages 
-            : data.pages.filter(page => page.wiki === filterSite)
+            : data.pages.filter(page => {
+                // 1. 根据下拉框的选项(可能是中文，也可能是简写)，找到对应的配置文件
+                const targetSiteConfig = config.SUPPORT_WIKI.find(w => 
+                    w.NAME === filterSite || w.WIKIT_ID === filterSite
+                );
+                
+                // 2. 如果找到了配置，并且配置了 WIKIT_ID，就强制使用 WIKIT_ID(简写) 去匹配文章的 page.wiki
+                if (targetSiteConfig && targetSiteConfig.WIKIT_ID) {
+                    return page.wiki === targetSiteConfig.WIKIT_ID;
+                }
+                
+                // 3. 兜底匹配
+                return page.wiki === filterSite;
+            })
     ) : [];
 
     return (
@@ -110,7 +123,6 @@ const AuthorProfile = () => {
             <div className="py-8">
                 <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-700 pb-6">
                     <h1 className="text-3xl font-bold text-white">
-                        {/* 修复：只要在搜索模式下（有 name），标题就固定为作者信息 */}
                         {name ? '作者信息' : '作者评分排行榜'}
                     </h1>
                     
@@ -140,7 +152,6 @@ const AuthorProfile = () => {
                     </div>
                 )}
 
-                {/* 作者主页视图 */}
                 {data && !loading && (
                     <div className="space-y-8">
                         <div className="flex items-center gap-6">
@@ -172,7 +183,8 @@ const AuthorProfile = () => {
                                     <h4 className="text-lg font-medium text-white mb-3">所属站点数据分布：</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                         {data.siteStats.map((site, index) => {
-                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.URL.includes(site.wiki));
+                                            // 概览卡片也使用 WIKIT_ID 进行映射匹配
+                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
                                             const siteName = siteConfig ? siteConfig.NAME : site.wiki;
                                             return (
                                                 <div key={index} className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
@@ -209,7 +221,8 @@ const AuthorProfile = () => {
                                     >
                                         <option value="all">全站总览 (All Sites)</option>
                                         {data.siteStats.map((site, index) => {
-                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.URL.includes(site.wiki));
+                                            // 下拉框文本也使用映射
+                                            const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
                                             const siteName = siteConfig ? siteConfig.NAME : site.wiki;
                                             return (
                                                 <option key={index} value={site.wiki}>
@@ -224,7 +237,8 @@ const AuthorProfile = () => {
                             {displayedPages.length > 0 ? (
                                 <div className="space-y-4">
                                     {displayedPages.map((page, index) => {
-                                        const siteConfig = config.SUPPORT_WIKI.find(w => w.URL.includes(page.wiki));
+                                        // 列表项匹配也加入 WIKIT_ID 支持
+                                        const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === page.wiki || w.URL.includes(page.wiki));
                                         const siteParam = siteConfig ? siteConfig.PARAM : page.wiki;
                                         const dateStr = page.created_at ? new Date(page.created_at).toLocaleDateString('zh-CN') : '未知时间';
 
@@ -268,8 +282,6 @@ const AuthorProfile = () => {
                     </div>
                 )}
 
-                {/* 排行榜视图 */}
-                {/* 修复：只有在 URL 没有 name 参数（非搜索状态）时，才显示排行榜 */}
                 {!name && rankingData && !loading && (
                     <div className="space-y-6">
                         <div className="flex flex-wrap gap-4 border-b border-gray-700 pb-4">
