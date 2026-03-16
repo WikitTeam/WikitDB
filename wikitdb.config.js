@@ -9,21 +9,21 @@ module.exports = {
             NAME: "深林文学部",
             URL: "https://deep-forest-club.wikidot.com/",
             ImgURL: "https://deep-forest-club.wdfiles.com/local--files/component%3Atheme/logo.png",
-            PARAM: "dfc"
+            PARAM: "dfc",
             WIKIT_ID: "deep-forest-club"
         },
         {
             NAME: "后室IF分站",
             URL: "https://if-backrooms.wikidot.com/",
             ImgURL: "https://laimu.backroomswiki.top/img/Logo.png",
-            PARAM: "if"
+            PARAM: "if",
             WIKIT_ID: "if-backrooms"
         },
         {
             NAME: "地下黑市",
             URL: "https://ubmh.wikidot.com/",
             ImgURL: "https://ubmh.wdfiles.com/local--files/admin%3Atheme/ubmh.webp",
-            PARAM: "ubmh"
+            PARAM: "ubmh",
             WIKIT_ID: "ubmh"
         }
     ]
