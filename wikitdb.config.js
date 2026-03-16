@@ -6,12 +6,6 @@ module.exports = {
 
     SUPPORT_WIKI: [
         {
-            NAME: "Wikidot",
-            URL: "https://www.wikidot.com/",
-            ImgURL: "/img/wikidot.png",
-            PARAM: "wikidot"
-        },
-        {
             NAME: "深林文学部",
             URL: "https://deep-forest-club.wikidot.com/",
             ImgURL: "https://deep-forest-club.wdfiles.com/local--files/component%3Atheme/logo.png",
