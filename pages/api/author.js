@@ -8,13 +8,22 @@ export default async function handler(req, res) {
     try {
         const queryName = name.trim();
         
-        // 构造 GraphQL 查询，同时获取全局排名和作品列表
+        // 1. 使用你提供的专门接口获取作者全局排名及统计数据
+        const rankRes = await fetch(`https://wikit.unitreaty.org/wikidot/rank?user=${encodeURIComponent(queryName)}`, {
+            method: 'GET',
+            cache: 'no-store'
+        });
+        
+        let rankData = {};
+        if (rankRes.ok) {
+            try {
+                rankData = await rankRes.json();
+            } catch (e) {}
+        }
+
+        // 2. 依然使用 GraphQL 获取具体的作品列表
         const query = `
         query {
-          rank: authorGlobalRank(name: "${queryName}", by: RATING) {
-            rank
-            value
-          }
           articles: articles(author: "${queryName}", page: 1, pageSize: 500) {
             nodes {
               title
@@ -36,24 +45,23 @@ export default async function handler(req, res) {
             cache: 'no-store'
         });
 
-        if (!gqlRes.ok) {
-            throw new Error(`HTTP 状态码异常: ${gqlRes.status}`);
+        let articlesData = [];
+        let totalPagesGql = 0;
+        if (gqlRes.ok) {
+            const gqlJson = await gqlRes.json();
+            if (!gqlJson.errors && gqlJson.data && gqlJson.data.articles) {
+                articlesData = gqlJson.data.articles.nodes || [];
+                totalPagesGql = gqlJson.data.articles.pageInfo?.total || 0;
+            }
         }
 
-        const gqlJson = await gqlRes.json();
-        
-        if (gqlJson.errors) {
-            throw new Error(gqlJson.errors[0].message);
-        }
-
-        const data = gqlJson.data;
-
-        // 根据 Wikidot 的规则拼接头像 URL (替换空格和下划线为连字符)
         const accountName = encodeURIComponent(queryName.toLowerCase().replace(/_/g, '-').replace(/ /g, '-'));
         const avatarUrl = `https://www.wikidot.com/avatar.php?account=${accountName}`;
 
-        const totalPages = data?.articles?.pageInfo?.total || 0;
-        const totalRating = data?.rank?.value || 0;
+        // 防御性解析 REST 接口的返回字段，并与 GraphQL 的总数进行兜底比对
+        const globalRank = rankData.rank || rankData.global_rank || '无记录';
+        const totalRating = rankData.rating || rankData.score || rankData.total_rating || 0;
+        const totalPages = rankData.pages || rankData.count || rankData.total_pages || totalPagesGql;
         
         let averageRating = 0;
         if (totalPages > 0) {
@@ -63,11 +71,11 @@ export default async function handler(req, res) {
         const authorData = {
             name: queryName,
             avatar: avatarUrl,
-            globalRank: data?.rank?.rank || '无记录',
+            globalRank: globalRank,
             totalRating: totalRating,
             totalPages: totalPages,
             averageRating: averageRating,
-            pages: data?.articles?.nodes || []
+            pages: articlesData
         };
 
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
