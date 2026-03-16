@@ -2,20 +2,24 @@ import * as cheerio from 'cheerio';
 const config = require('../../wikitdb.config.js');
 
 export default async function handler(req, res) {
-    const { site, url } = req.query;
+    // 核心优化：彻底抛弃 url 参数，改用更安全的 page 页面名
+    const { site, page } = req.query;
 
-    if (!site || !url || url === 'undefined') {
-        return res.status(400).json({ error: '缺少有效的 site 或 url 参数' });
+    if (!site || !page || page === 'undefined') {
+        return res.status(400).json({ error: '缺少有效的 site 或 page 参数' });
     }
 
-    const cleanUrl = url.split('|')[0].split('#')[0].trim();
-    const secureUrl = cleanUrl.replace(/^http:\/\//i, 'https://');
-    const pageName = cleanUrl.split('/').pop().toLowerCase();
+    // 强制清洗页面名
+    const pageName = page.split('|')[0].split('#')[0].trim().toLowerCase();
 
     const wikiConfig = config.SUPPORT_WIKI.find(w => w.PARAM === site);
     if (!wikiConfig) {
         return res.status(404).json({ error: '未找到该站点配置' });
     }
+
+    // 后端自动拼接绝对安全的完整 https 链接，用于底层兜底和页面跳转
+    const baseUrl = wikiConfig.URL.replace(/\/$/, '');
+    const secureUrl = `${baseUrl}/${pageName}`;
 
     try {
         const fetchHeaders = {
@@ -28,6 +32,7 @@ export default async function handler(req, res) {
             fetch('https://wikit.unitreaty.org/apiv1/graphql', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
+                // GraphQL 接口严格使用提取好的 pageName
                 body: JSON.stringify({
                     query: `query { article(wiki: "${site}", page: "${pageName}") { title rating author tags created_at lastmod } }`
                 }),
@@ -74,7 +79,6 @@ export default async function handler(req, res) {
             });
         }
 
-        // 初始作者信息（后续会被历史记录提取严格覆盖）
         let creatorName = gqlData?.author || $('.printuser').first().text().trim() || '未知';
         let creatorAvatar = null;
         const printusers = $('.printuser');
@@ -103,6 +107,7 @@ export default async function handler(req, res) {
         let wikitHistoryFailed = false; 
 
         try {
+            // Wikit 历史接口严格使用拼接好的完整 secureUrl
             const wikitHistUrl = `https://wikit.unitreaty.org/wikidot/pagehistory?wiki=${site}&page=${encodeURIComponent(secureUrl)}`;
             const histRes = await fetch(wikitHistUrl, {
                 method: 'GET',
@@ -225,7 +230,6 @@ export default async function handler(req, res) {
         if (historyHtml && !historyHtml.startsWith('{')) {
             const $hist = cheerio.load(historyHtml, null, false);
             
-            // 核心修复：直接从历史记录最后一行（通常是建页版本）提取真正的第一个编辑者，彻底覆盖上面的数据
             const lastRow = $hist('table.page-history tr').last();
             if (lastRow.length > 0) {
                 const firstEditor = lastRow.find('.printuser').first();
