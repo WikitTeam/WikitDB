@@ -188,9 +188,11 @@ const PageDetail = () => {
                 <div className="bg-gray-800/30 rounded-xl p-6 border border-white/5 min-h-[400px]">
                     {activeTab === '源码' && (
                         <div className="bg-gray-900 p-4 rounded-lg overflow-x-auto border border-gray-700">
-                            <pre className="text-gray-300 text-sm whitespace-pre-wrap font-mono break-all">
-                                {data.sourceCode}
-                            </pre>
+                            {/* 按照 Kakushi 的要求：让浏览器自己原生解析 HTML 标签 */}
+                            <div 
+                                className="text-gray-300 text-sm whitespace-pre-wrap font-mono break-all"
+                                dangerouslySetInnerHTML={{ __html: data.sourceCode }}
+                            />
                         </div>
                     )}
 
