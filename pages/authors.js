@@ -10,11 +10,13 @@ const AuthorProfile = () => {
 
     const [searchInput, setSearchInput] = useState('');
     const [data, setData] = useState(null);
-    const [rankingData, setRankingData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('global');
     const [filterSite, setFilterSite] = useState('all');
+
+    // 核心改造 1：引入缓存字典，点过的排行数据全部存在这里面
+    const [rankingCache, setRankingCache] = useState({});
 
     useEffect(() => {
         if (!router.isReady) return;
@@ -25,7 +27,13 @@ const AuthorProfile = () => {
         } else {
             setSearchInput('');
             setData(null);
-            fetchRankingData();
+            
+            // 初次进入页面时，只有当 'global' 没被缓存过，才去请求全站总排行
+            if (!rankingCache['global']) {
+                fetchRankingData('global');
+            } else {
+                setActiveTab('global');
+            }
         }
     }, [router.isReady, name]);
 
@@ -55,19 +63,25 @@ const AuthorProfile = () => {
         }
     };
 
-    const fetchRankingData = async () => {
+    // 核心改造 2：带有参数的动态获取函数
+    const fetchRankingData = async (tabParam) => {
         setLoading(true);
         setError(null);
         
         try {
-            const res = await fetch('/api/ranking');
+            const res = await fetch(`/api/ranking?site=${tabParam}`);
             const result = await res.json();
             
             if (!res.ok) {
                 throw new Error(result.details || result.error || '获取排行榜失败');
             }
             
-            setRankingData(result);
+            // 将获取到的新数据塞进缓存字典里
+            setRankingCache(prev => ({
+                ...prev,
+                [tabParam]: result.ranking
+            }));
+            setActiveTab(tabParam);
         } catch (err) {
             setError(err.message);
         } finally {
@@ -84,17 +98,18 @@ const AuthorProfile = () => {
         }
     };
 
-    let currentRankingList = [];
-    if (rankingData) {
-        if (activeTab === 'global') {
-            currentRankingList = rankingData.global;
-        } else {
-            const siteData = rankingData.sites.find(s => s.param === activeTab);
-            if (siteData) currentRankingList = siteData.ranking;
+    // 核心改造 3：点击 Tab 时判断是否需要发请求
+    const handleTabClick = (tabParam) => {
+        setActiveTab(tabParam);
+        // 如果缓存里没有这个站的数据，才去后台拉取，否则直接秒切！
+        if (!rankingCache[tabParam]) {
+            fetchRankingData(tabParam);
         }
-    }
+    };
 
-    // 1. 动态计算各个站点的实际文章数量 (完全基于底层简写)
+    // 取出当前选中 Tab 的数据
+    const currentRankingList = rankingCache[activeTab] || [];
+
     const siteCounts = {};
     if (data && data.pages) {
         data.pages.forEach(page => {
@@ -102,7 +117,6 @@ const AuthorProfile = () => {
         });
     }
 
-    // 2. 极简过滤逻辑：直接匹配底层简写
     const displayedPages = data && data.pages ? (
         filterSite === 'all' 
             ? data.pages 
@@ -137,7 +151,7 @@ const AuthorProfile = () => {
 
                 {loading && (
                     <div className="text-gray-400 flex items-center justify-center py-12">
-                        正在检索数据中...
+                        正在加载数据...
                     </div>
                 )}
 
@@ -207,7 +221,6 @@ const AuthorProfile = () => {
                                     所有发布页面 <span className="text-sm font-normal text-gray-400">(按创建时间倒序)</span>
                                 </h3>
                                 
-                                {/* 完全根据实际文章数据生成下拉框，彻底杜绝匹配失效 */}
                                 {Object.keys(siteCounts).length > 0 && (
                                     <select
                                         value={filterSite}
@@ -275,11 +288,12 @@ const AuthorProfile = () => {
                     </div>
                 )}
 
-                {!name && rankingData && !loading && (
+                {/* 核心改造 4：无缝渲染排行榜的各个站点按钮 */}
+                {!name && !loading && (
                     <div className="space-y-6">
                         <div className="flex flex-wrap gap-4 border-b border-gray-700 pb-4">
                             <button
-                                onClick={() => setActiveTab('global')}
+                                onClick={() => handleTabClick('global')}
                                 className={`px-4 py-2 rounded-md font-medium transition-colors ${
                                     activeTab === 'global'
                                         ? 'bg-indigo-600 text-white'
@@ -288,17 +302,18 @@ const AuthorProfile = () => {
                             >
                                 全站总排行
                             </button>
-                            {rankingData.sites.map((site) => (
+                            
+                            {config.SUPPORT_WIKI.map((site) => (
                                 <button
-                                    key={site.param}
-                                    onClick={() => setActiveTab(site.param)}
+                                    key={site.PARAM}
+                                    onClick={() => handleTabClick(site.PARAM)}
                                     className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                                        activeTab === site.param
+                                        activeTab === site.PARAM
                                             ? 'bg-indigo-600 text-white'
                                             : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
                                     }`}
                                 >
-                                    {site.name}
+                                    {site.NAME}
                                 </button>
                             ))}
                         </div>
@@ -343,7 +358,7 @@ const AuthorProfile = () => {
                                         ) : (
                                             <tr>
                                                 <td colSpan="3" className="p-8 text-center text-gray-500">
-                                                    暂无排行数据
+                                                    暂无排行数据或尚未加载完毕
                                                 </td>
                                             </tr>
                                         )}
