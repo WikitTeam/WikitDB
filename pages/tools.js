@@ -17,7 +17,6 @@ const Tools = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* 成员管理工具卡片 */}
                     <Link 
                         href="/tools/member-admin" 
                         className="bg-gray-800/50 rounded-xl p-6 border border-white/10 hover:border-indigo-500/50 hover:bg-gray-800 transition-all group block"
@@ -26,14 +25,13 @@ const Tools = () => {
                             <i className="fa-solid fa-user-shield"></i>
                         </div>
                         <h2 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors">
-                            成员管理 (Member Admin)
+                            成员管理
                         </h2>
                         <p className="text-sm text-gray-400 leading-relaxed">
                             调用 Wikit 官方 API，安全地对指定站点的 Wikidot 用户执行移除或封禁操作。
                         </p>
                     </Link>
 
-                    {/* 虚线占位框：提示未来会有更多工具 */}
                     <div className="bg-gray-800/30 rounded-xl p-6 border border-white/5 border-dashed flex flex-col items-center justify-center text-center min-h-[200px] opacity-70">
                         <i className="fa-solid fa-plus text-3xl text-gray-600 mb-3"></i>
                         <h2 className="text-lg font-medium text-gray-500">更多工具</h2>
