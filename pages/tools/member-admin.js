@@ -76,7 +76,7 @@ const MemberAdmin = () => {
                                     type="text"
                                     name="wiki"
                                     required
-                                    placeholder="填入简写，如 backrooms-wiki-cn"
+                                    placeholder="填入简写，如 if-backrooms"
                                     value={formData.wiki}
                                     onChange={handleChange}
                                     className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 transition-colors"
