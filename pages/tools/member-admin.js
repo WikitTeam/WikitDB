@@ -64,7 +64,7 @@ const MemberAdmin = () => {
                     <Link href="/tools" className="text-gray-400 hover:text-white transition-colors">
                         <i className="fa-solid fa-arrow-left"></i> 返回
                     </Link>
-                    <h1 className="text-2xl font-bold text-white">成员管理 (Member Admin)</h1>
+                    <h1 className="text-2xl font-bold text-white">成员管理</h1>
                 </div>
 
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-white/10">
