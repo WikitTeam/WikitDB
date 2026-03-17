@@ -32,7 +32,6 @@ export default async function handler(req, res) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    // 在此处增加了 upvotes 和 downvotes
                     query: `query { article(wiki: "${actualWikiName}", page: "${pageName}") { title rating upvotes downvotes author tags created_at lastmod page_id } }`
                 }),
                 cache: 'no-store'
@@ -193,8 +192,10 @@ export default async function handler(req, res) {
                     const data = await srcRes.value.json();
                     if (data.status === 'ok') {
                         const $src = cheerio.load(data.body);
-                        // 按照 Kakushi 的要求：剥掉最外层div，其他原样填入，不使用正则做任何转换
-                        sourceCode = $src('.page-source').html() || data.body;
+                        let rawHtml = $src('.page-source').html() || data.body || '';
+                        
+                        // 核心修复：仅剥离掉每一行最开头的连续空格/Tab，以及首尾的多余空行。绝不碰 HTML 标签。
+                        sourceCode = rawHtml.replace(/^[ \t]+/gm, '').trim();
                     } else {
                         sourceCode = `请求源码失败，原站返回: ${data.status}`;
                     }
