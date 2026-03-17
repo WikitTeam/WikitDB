@@ -6,35 +6,34 @@ export default async function handler(req, res) {
     const { token, wiki, username, password, member, action, reason } = req.body;
 
     if (!token || !wiki || !username || !password || !member || !action) {
-        return res.status(400).json({ status: 'error', message: '缺少必填参数' });
+        return res.status(400).json({ status: 'error', message: '前端校验失败：请填写所有必填项' });
     }
 
     try {
-        const payload = {
-            token,
-            wiki,
-            username,
-            password,
-            member,
-            action
-        };
+        const payload = new URLSearchParams();
+        payload.append('token', token);
+        payload.append('wiki', wiki);
+        payload.append('username', username);
+        payload.append('password', password);
+        payload.append('member', member);
+        payload.append('action', action);
 
         if (action === 'ban' && reason) {
-            payload.reason = reason;
+            payload.append('reason', reason);
         }
 
         const fetchRes = await fetch('https://wikit.unitreaty.org/wikidot/member-admin', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                // 核心修改：将 Content-Type 改为表单格式
+                'Content-Type': 'application/x-www-form-urlencoded',
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
-            body: JSON.stringify(payload)
+            body: payload.toString()
         });
 
         const data = await fetchRes.json();
         
-        // 按照截图说明，状态是 success 和 error
         if (data.status === 'success') {
             return res.status(200).json(data);
         } else {
