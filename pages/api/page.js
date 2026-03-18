@@ -1,6 +1,5 @@
 import * as cheerio from 'cheerio';
-import fs from 'fs';
-import path from 'path';
+import { kv } from '@vercel/kv';
 const config = require('../../wikitdb.config.js');
 
 export default async function handler(req, res) {
@@ -105,28 +104,20 @@ export default async function handler(req, res) {
 
         let scoreHistory = [];
         try {
-            const historyFilePath = path.join(process.cwd(), 'rating_history.json');
-            let historyData = {};
-            if (fs.existsSync(historyFilePath)) {
-                historyData = JSON.parse(fs.readFileSync(historyFilePath, 'utf-8'));
-            }
-            
-            const pageKey = `${actualWikiName}_${pageName}`;
-            if (!historyData[pageKey]) {
-                historyData[pageKey] = {};
-            }
+            const pageKey = `rating_history_${actualWikiName}_${pageName}`;
+            let historyData = await kv.get(pageKey) || {};
             
             const now = new Date();
             const cstTime = new Date(now.getTime() + 8 * 60 * 60 * 1000);
             const today = cstTime.toISOString().split('T')[0];
             
-            historyData[pageKey][today] = currentScoreNum;
+            historyData[today] = currentScoreNum;
             
-            fs.writeFileSync(historyFilePath, JSON.stringify(historyData, null, 2));
+            await kv.set(pageKey, historyData);
             
-            scoreHistory = Object.keys(historyData[pageKey]).sort().map(date => ({
+            scoreHistory = Object.keys(historyData).sort().map(date => ({
                 date: date,
-                score: historyData[pageKey][date]
+                score: historyData[date]
             }));
         } catch (e) {
             console.error('记录评分历史失败:', e);
