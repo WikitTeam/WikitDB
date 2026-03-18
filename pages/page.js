@@ -71,24 +71,28 @@ const PageDetail = () => {
 
     if (!data) return null;
 
-    let currentScore = 0;
-    const chartData = [{ index: 0, score: 0, user: '初始状态', vote: null }];
-    if (data.ratingTable && data.ratingTable.length > 0) {
-        data.ratingTable.forEach((rate, idx) => {
-            currentScore += (rate.vote === '+1' ? 1 : -1);
-            chartData.push({ index: idx + 1, score: currentScore, user: rate.user, vote: rate.vote });
-        });
+    let chartData = [];
+    if (data.scoreHistory && data.scoreHistory.length > 0) {
+        chartData = data.scoreHistory.map((item, idx) => ({
+            index: idx,
+            score: item.score,
+            date: item.date
+        }));
+        
+        if (chartData.length === 1) {
+            chartData.unshift({ index: -1, score: chartData[0].score, date: '开始记录' });
+        }
     }
 
-    const maxScore = Math.max(...chartData.map(d => d.score));
-    const minScore = Math.min(...chartData.map(d => d.score));
+    const maxScore = chartData.length > 0 ? Math.max(...chartData.map(d => d.score)) : 0;
+    const minScore = chartData.length > 0 ? Math.min(...chartData.map(d => d.score)) : 0;
     const rangeY = Math.max(maxScore - minScore, 1);
     
     const svgWidth = 800;
     const svgHeight = 240;
     const padX = 40;
     const padY = 40;
-    const scaleX = (svgWidth - padX * 2) / Math.max(chartData.length - 1, 1);
+    const scaleX = chartData.length > 1 ? (svgWidth - padX * 2) / (chartData.length - 1) : 1;
     const scaleY = (svgHeight - padY * 2) / rangeY;
     const zeroY = svgHeight - padY - (0 - minScore) * scaleY;
 
@@ -299,7 +303,7 @@ const PageDetail = () => {
                                 <>
                                     <div className="w-full overflow-x-auto bg-gray-900/50 p-6 rounded-lg border border-gray-700">
                                         <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
-                                            <i className="fa-solid fa-chart-line text-indigo-400"></i> 评分走势
+                                            <i className="fa-solid fa-chart-line text-indigo-400"></i> 按日评分走势
                                         </h3>
                                         <div className="min-w-[600px] relative">
                                             <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto drop-shadow-lg overflow-visible">
@@ -328,7 +332,7 @@ const PageDetail = () => {
                                                                 cx={x} 
                                                                 cy={y} 
                                                                 r="4" 
-                                                                fill={d.vote === '+1' ? '#34D399' : d.vote === '-1' ? '#F87171' : '#9CA3AF'} 
+                                                                fill="#818CF8"
                                                                 stroke="#1F2937"
                                                                 strokeWidth="1.5"
                                                                 className="transition-all duration-200 group-hover:r-[6px]" 
@@ -339,7 +343,7 @@ const PageDetail = () => {
                                                                     {d.score > 0 ? `+${d.score}` : d.score}
                                                                 </text>
                                                                 <text x={x} y={y - 18} fontSize="10" fill="#9CA3AF" textAnchor="middle">
-                                                                    {d.user}
+                                                                    {d.date}
                                                                 </text>
                                                             </g>
                                                         </g>
@@ -348,41 +352,45 @@ const PageDetail = () => {
                                             </svg>
                                         </div>
                                     </div>
-
-                                    <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-700">
-                                        <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
-                                            <i className="fa-solid fa-users text-indigo-400"></i> 评分详细列表
-                                        </h3>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                            {data.ratingTable.map((rate, index) => (
-                                                <div key={index} className="flex items-center gap-3 bg-gray-800 p-3 rounded-lg border border-gray-600/50 hover:border-gray-500 transition-colors">
-                                                    <img 
-                                                        src={rate.avatar} 
-                                                        alt={rate.user} 
-                                                        className="w-8 h-8 rounded object-cover border border-gray-600"
-                                                        onError={(e) => { e.target.src = 'https://www.wikidot.com/local--favicon/favicon.gif'; }}
-                                                    />
-                                                    <div className="flex-1 min-w-0">
-                                                        <Link 
-                                                            href={`/authors?name=${encodeURIComponent(rate.user)}`} 
-                                                            className="text-sm font-medium text-indigo-400 hover:text-indigo-300 truncate block"
-                                                        >
-                                                            {rate.user}
-                                                        </Link>
-                                                    </div>
-                                                    <span className={`text-sm font-bold px-2 py-0.5 rounded ${rate.vote === '+1' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                                                        {rate.vote === '+1' ? '+1' : '-1'}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
                                 </>
                             ) : (
-                                <div className="text-center py-20 text-gray-500 bg-gray-900/50 rounded-lg border border-gray-700">
-                                    <i className="fa-solid fa-ghost text-4xl mb-4 opacity-20"></i>
-                                    <p className="text-lg font-medium">暂无评分数据</p>
-                                    <p className="text-sm opacity-60">该页面尚未被任何人评分，或无法抓取原站评分列表。</p>
+                                <div className="text-center py-10 text-gray-400 bg-gray-900/50 rounded-lg border border-gray-700">
+                                    开始记录数据... 明日即可生成走势曲线。
+                                </div>
+                            )}
+
+                            {data.ratingTable && data.ratingTable.length > 0 ? (
+                                <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-700">
+                                    <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
+                                        <i className="fa-solid fa-users text-indigo-400"></i> 当前评分者列表
+                                    </h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                        {data.ratingTable.map((rate, index) => (
+                                            <div key={index} className="flex items-center gap-3 bg-gray-800 p-3 rounded-lg border border-gray-600/50 hover:border-gray-500 transition-colors">
+                                                <img 
+                                                    src={rate.avatar} 
+                                                    alt={rate.user} 
+                                                    className="w-8 h-8 rounded object-cover border border-gray-600"
+                                                    onError={(e) => { e.target.src = 'https://www.wikidot.com/local--favicon/favicon.gif'; }}
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <Link 
+                                                        href={`/authors?name=${encodeURIComponent(rate.user)}`} 
+                                                        className="text-sm font-medium text-indigo-400 hover:text-indigo-300 truncate block"
+                                                    >
+                                                        {rate.user}
+                                                    </Link>
+                                                </div>
+                                                <span className={`text-sm font-bold px-2 py-0.5 rounded ${rate.vote === '+1' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                                                    {rate.vote === '+1' ? '+1' : '-1'}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center py-10 text-gray-500 bg-gray-900/50 rounded-lg border border-gray-700">
+                                    暂无当前评分者数据
                                 </div>
                             )}
                         </div>
