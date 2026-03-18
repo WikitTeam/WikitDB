@@ -12,9 +12,6 @@ const PageDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('源码');
-    
-    // 新增：用于存储从浏览器 localStorage 读取的每日历史评分数据
-    const [ratingHistory, setRatingHistory] = useState([]);
 
     const tabs = ['源码', '信息', '历史', '评分'];
 
@@ -46,42 +43,6 @@ const PageDetail = () => {
         }
     }, [router.isReady, site, page]);
 
-    // 核心记录逻辑：每次获取到数据后，检查并更新本地的“每日评分”记录
-    useEffect(() => {
-        if (data && data.pageId) {
-            const historyKey = `wikit_rating_history_${data.pageId}`;
-            let history = [];
-            
-            try {
-                const stored = localStorage.getItem(historyKey);
-                if (stored) {
-                    history = JSON.parse(stored);
-                }
-            } catch (e) {}
-
-            const today = new Date().toLocaleDateString('zh-CN');
-            
-            let currentRating = 0;
-            if (data.rating && data.rating !== 'N/A') {
-                currentRating = parseInt(data.rating.toString().replace('+', ''), 10) || 0;
-            }
-
-            const lastEntry = history[history.length - 1];
-            
-            if (!lastEntry || lastEntry.date !== today) {
-                // 如果今天还没记录，追加新记录
-                history.push({ date: today, score: currentRating });
-                localStorage.setItem(historyKey, JSON.stringify(history));
-            } else if (lastEntry.score !== currentRating) {
-                // 如果今天已经记录过，但分数发生了变化，更新今天的记录
-                history[history.length - 1].score = currentRating;
-                localStorage.setItem(historyKey, JSON.stringify(history));
-            }
-
-            setRatingHistory(history);
-        }
-    }, [data]);
-
     if (loading) {
         return <div className="py-12 text-center text-gray-400">加载详情数据中...</div>;
     }
@@ -97,10 +58,17 @@ const PageDetail = () => {
 
     if (!data) return null;
 
-    // SVG 图表计算逻辑 (基于本地每日记录)
-    const chartData = ratingHistory;
-    const maxScore = chartData.length > 0 ? Math.max(...chartData.map(d => d.score)) : 0;
-    const minScore = chartData.length > 0 ? Math.min(...chartData.map(d => d.score)) : 0;
+    let currentScore = 0;
+    const chartData = [{ index: 0, score: 0, user: '初始状态', vote: null }];
+    if (data.ratingTable && data.ratingTable.length > 0) {
+        data.ratingTable.forEach((rate, idx) => {
+            currentScore += (rate.vote === '+1' ? 1 : -1);
+            chartData.push({ index: idx + 1, score: currentScore, user: rate.user, vote: rate.vote });
+        });
+    }
+
+    const maxScore = Math.max(...chartData.map(d => d.score));
+    const minScore = Math.min(...chartData.map(d => d.score));
     const rangeY = Math.max(maxScore - minScore, 1);
     
     const svgWidth = 800;
@@ -177,6 +145,13 @@ const PageDetail = () => {
                                             )}
                                         </div>
                                     </div>
+
+                                    {data.comments !== undefined && data.comments !== null && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-gray-500">评论数:</span>
+                                            <span className="font-medium text-gray-300">{data.comments}</span>
+                                        </div>
+                                    )}
 
                                     {data.pageId && (
                                         <div className="flex items-center gap-2">
@@ -300,11 +275,11 @@ const PageDetail = () => {
 
                     {activeTab === '评分' && (
                         <div className="space-y-6">
-                            {chartData.length > 0 ? (
+                            {chartData.length > 1 ? (
                                 <>
                                     <div className="w-full overflow-x-auto bg-gray-900/50 p-6 rounded-lg border border-gray-700">
                                         <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
-                                            <i className="fa-solid fa-chart-line text-indigo-400"></i> 评分走势 (基于本地记录)
+                                            <i className="fa-solid fa-chart-line text-indigo-400"></i> 评分走势
                                         </h3>
                                         <div className="min-w-[600px] relative">
                                             <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto drop-shadow-lg overflow-visible">
@@ -314,17 +289,15 @@ const PageDetail = () => {
                                                 {maxScore !== 0 && <text x={padX - 10} y={svgHeight - padY - (maxScore - minScore) * scaleY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">{maxScore}</text>}
                                                 {minScore !== 0 && <text x={padX - 10} y={svgHeight - padY - (minScore - minScore) * scaleY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">{minScore}</text>}
 
-                                                {chartData.length > 1 && (
-                                                    <polyline
-                                                        fill="none"
-                                                        stroke="#818CF8" 
-                                                        strokeWidth="3"
-                                                        strokeLinecap="round"
-                                                        strokeLinejoin="round"
-                                                        points={polylinePoints}
-                                                        className="drop-shadow-[0_0_8px_rgba(129,140,248,0.5)]"
-                                                    />
-                                                )}
+                                                <polyline
+                                                    fill="none"
+                                                    stroke="#818CF8" 
+                                                    strokeWidth="3"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    points={polylinePoints}
+                                                    className="drop-shadow-[0_0_8px_rgba(129,140,248,0.5)]"
+                                                />
                                                 
                                                 {chartData.map((d, i) => {
                                                     const x = padX + i * scaleX;
@@ -335,7 +308,7 @@ const PageDetail = () => {
                                                                 cx={x} 
                                                                 cy={y} 
                                                                 r="4" 
-                                                                fill="#34D399" 
+                                                                fill={d.vote === '+1' ? '#34D399' : d.vote === '-1' ? '#F87171' : '#9CA3AF'} 
                                                                 stroke="#1F2937"
                                                                 strokeWidth="1.5"
                                                                 className="transition-all duration-200 group-hover:r-[6px]" 
@@ -346,7 +319,7 @@ const PageDetail = () => {
                                                                     {d.score > 0 ? `+${d.score}` : d.score}
                                                                 </text>
                                                                 <text x={x} y={y - 18} fontSize="10" fill="#9CA3AF" textAnchor="middle">
-                                                                    {d.date}
+                                                                    {d.user}
                                                                 </text>
                                                             </g>
                                                         </g>
@@ -356,41 +329,40 @@ const PageDetail = () => {
                                         </div>
                                     </div>
 
-                                    {data.ratingTable && data.ratingTable.length > 0 && (
-                                        <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-700">
-                                            <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
-                                                <i className="fa-solid fa-users text-indigo-400"></i> 评分详细列表
-                                            </h3>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                                {data.ratingTable.map((rate, index) => (
-                                                    <div key={index} className="flex items-center gap-3 bg-gray-800 p-3 rounded-lg border border-gray-600/50 hover:border-gray-500 transition-colors">
-                                                        <img 
-                                                            src={rate.avatar} 
-                                                            alt={rate.user} 
-                                                            className="w-8 h-8 rounded object-cover border border-gray-600"
-                                                            onError={(e) => { e.target.src = 'https://www.wikidot.com/local--favicon/favicon.gif'; }}
-                                                        />
-                                                        <div className="flex-1 min-w-0">
-                                                            <Link 
-                                                                href={`/authors?name=${encodeURIComponent(rate.user)}`} 
-                                                                className="text-sm font-medium text-indigo-400 hover:text-indigo-300 truncate block"
-                                                            >
-                                                                {rate.user}
-                                                            </Link>
-                                                        </div>
-                                                        <span className={`text-sm font-bold px-2 py-0.5 rounded ${rate.vote === '+1' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                                                            {rate.vote === '+1' ? '+1' : '-1'}
-                                                        </span>
+                                    <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-700">
+                                        <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
+                                            <i className="fa-solid fa-users text-indigo-400"></i> 评分详细列表
+                                        </h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                            {data.ratingTable.map((rate, index) => (
+                                                <div key={index} className="flex items-center gap-3 bg-gray-800 p-3 rounded-lg border border-gray-600/50 hover:border-gray-500 transition-colors">
+                                                    <img 
+                                                        src={rate.avatar} 
+                                                        alt={rate.user} 
+                                                        className="w-8 h-8 rounded object-cover border border-gray-600"
+                                                        onError={(e) => { e.target.src = 'https://www.wikidot.com/local--favicon/favicon.gif'; }}
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                        <Link 
+                                                            href={`/authors?name=${encodeURIComponent(rate.user)}`} 
+                                                            className="text-sm font-medium text-indigo-400 hover:text-indigo-300 truncate block"
+                                                        >
+                                                            {rate.user}
+                                                        </Link>
                                                     </div>
-                                                ))}
-                                            </div>
+                                                    <span className={`text-sm font-bold px-2 py-0.5 rounded ${rate.vote === '+1' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                                                        {rate.vote === '+1' ? '+1' : '-1'}
+                                                    </span>
+                                                </div>
+                                            ))}
                                         </div>
-                                    )}
+                                    </div>
                                 </>
                             ) : (
                                 <div className="text-center py-20 text-gray-500 bg-gray-900/50 rounded-lg border border-gray-700">
                                     <i className="fa-solid fa-ghost text-4xl mb-4 opacity-20"></i>
-                                    <p className="text-lg font-medium">暂无评分记录</p>
+                                    <p className="text-lg font-medium">暂无评分数据</p>
+                                    <p className="text-sm opacity-60">该页面尚未被任何人评分，或无法抓取原站评分列表。</p>
                                 </div>
                             )}
                         </div>
