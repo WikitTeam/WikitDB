@@ -200,7 +200,8 @@ export default async function handler(req, res) {
                     if (data.status === 'ok') {
                         const $src = cheerio.load(data.body);
                         let rawHtml = $src('.page-source').html() || data.body || '';
-                        sourceCode = rawHtml.replace(/^[ \t]+/gm, '').trim();
+                        rawHtml = rawHtml.replace(/<br\s*\/?>/gi, '\n');
+                        sourceCode = rawHtml.replace(/^(?:[ \t\u00a0\u3000]|&nbsp;)+/gm, '').trim();
                     } else {
                         sourceCode = `请求源码失败，原站返回: ${data.status}`;
                     }
@@ -304,24 +305,38 @@ export default async function handler(req, res) {
                 }
             }
 
-            const firstRowText = $hist('table.page-history tr').first().text().toLowerCase();
-            if (firstRowText.includes('actions') || firstRowText.includes('操作') || firstRowText.includes('rev.') || firstRowText.includes('by')) {
-                const colIndicesToRemove = [];
-                $hist('table.page-history tr').first().find('td, th').each((j, cell) => {
-                    const text = $hist(cell).text().replace(/\u00a0/g, '').trim().toLowerCase();
-                    if (text === 'actions' || text === '操作' || text === 'vs.' || text === 'vs' || text === '') {
-                        colIndicesToRemove.push(j);
-                    }
-                });
+            let colsToRemove = new Set();
 
-                if (colIndicesToRemove.length > 0) {
-                    $hist('table.page-history tr').each((i, row) => {
-                        const cells = $hist(row).find('td, th');
-                        for (let k = colIndicesToRemove.length - 1; k >= 0; k--) {
-                            cells.eq(colIndicesToRemove[k]).remove();
-                        }
-                    });
+            $hist('table.page-history tr').first().find('th, td').each((j, cell) => {
+                const text = $hist(cell).text().toLowerCase().replace(/\s+/g, '');
+                if (text.includes('actions') || text.includes('操作')) {
+                    colsToRemove.add(j);
                 }
+            });
+
+            $hist('table.page-history tr').eq(1).find('td').each((j, cell) => {
+                const $cell = $hist(cell);
+                if ($cell.find('input[type="radio"]').length > 0) {
+                    colsToRemove.add(j);
+                }
+                const hasVSR = $cell.find('a').filter((_, a) => {
+                    const aText = $hist(a).text().trim().toUpperCase();
+                    return aText === 'V' || aText === 'S' || aText === 'R';
+                }).length > 0;
+                if (hasVSR) {
+                    colsToRemove.add(j);
+                }
+            });
+
+            const colsArray = Array.from(colsToRemove).sort((a, b) => b - a);
+            
+            if (colsArray.length > 0) {
+                $hist('table.page-history tr').each((i, row) => {
+                    const cells = $hist(row).find('th, td');
+                    colsArray.forEach(colIdx => {
+                        cells.eq(colIdx).remove();
+                    });
+                });
             }
             
             $hist('.buttons, .options, .page-history-options').remove();
