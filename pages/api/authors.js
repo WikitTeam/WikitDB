@@ -1,5 +1,4 @@
 import * as cheerio from 'cheerio';
-const config = require('../../wikitdb.config.js');
 
 export default async function handler(req, res) {
     const { name } = req.query;
@@ -19,8 +18,8 @@ export default async function handler(req, res) {
         let parsedFromRankApi = false;
         let userid = null;
         let articlesData = [];
-        let tagArticlesData = [];
 
+        // 发起并发请求
         const [rankRes, gqlRes] = await Promise.allSettled([
             fetch(`https://wikit.unitreaty.org/wikidot/rank?user=${encodeURIComponent(queryName)}`, {
                 method: 'GET',
@@ -30,15 +29,13 @@ export default async function handler(req, res) {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    query: `query {
-                        articles(author: "${queryName}", page: 1, pageSize: 500) { nodes { title wiki page rating created_at author_id tags } }
-                        tagArticles: articles(title: "%${queryName}%", page: 1, pageSize: 50) { nodes { title wiki page tags } }
-                    }` 
+                    query: `query { articles(author: "${queryName}", page: 1, pageSize: 500) { nodes { title wiki page rating created_at author_id } } }` 
                 }),
                 cache: 'no-store'
             })
         ]);
 
+        // 解析排名
         if (rankRes.status === 'fulfilled' && rankRes.value.ok) {
             const rankHtml = await rankRes.value.text();
             const cleanHtml = rankHtml.replace(/<br\s*\/?>/gi, '\n');
@@ -71,19 +68,22 @@ export default async function handler(req, res) {
             }
         }
 
+        // 解析文章并提取作者 ID
         if (gqlRes.status === 'fulfilled' && gqlRes.value.ok) {
             const gqlJson = await gqlRes.value.json();
             if (!gqlJson.errors && gqlJson.data && gqlJson.data.articles) {
                 articlesData = gqlJson.data.articles.nodes || [];
+                // 如果有文章数据，直接从第一篇里抽出 userid
                 if (articlesData.length > 0 && articlesData[0].author_id) {
                     userid = articlesData[0].author_id;
                 }
             }
-            if (!gqlJson.errors && gqlJson.data && gqlJson.data.tagArticles) {
-                tagArticlesData = gqlJson.data.tagArticles.nodes || [];
-            }
         }
 
+        // ==========================================
+        // 核心修复：用户查无此人校验
+        // 如果排名接口没数据，且名下一篇文章都没有，直接抛出 404 拦截
+        // ==========================================
         if (!parsedFromRankApi && articlesData.length === 0) {
             return res.status(404).json({ 
                 error: '未查找到该作者', 
@@ -91,6 +91,7 @@ export default async function handler(req, res) {
             });
         }
 
+        // 兜底计算
         if (!parsedFromRankApi) {
             let calcGlobalRating = 0;
             const siteStatsMap = {};
@@ -108,26 +109,10 @@ export default async function handler(req, res) {
             siteStats = Object.values(siteStatsMap).sort((a, b) => b.count - a.count);
         }
 
-        siteStats.forEach(stat => {
-            const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === stat.wiki || w.NAME === stat.wiki || w.URL.includes(stat.wiki));
-            if (siteConfig && siteConfig.AUTHOR_TAG) {
-                let authorArticle = articlesData.find(a => (a.wiki === stat.wiki || a.wiki === siteConfig.WIKIT_ID) && a.tags && a.tags.includes(siteConfig.AUTHOR_TAG));
-                if (!authorArticle) {
-                    authorArticle = tagArticlesData.find(a => (a.wiki === stat.wiki || a.wiki === siteConfig.WIKIT_ID) && a.tags && a.tags.includes(siteConfig.AUTHOR_TAG));
-                }
-                if (authorArticle) {
-                    stat.authorPage = {
-                        title: authorArticle.title,
-                        page: authorArticle.page,
-                        siteParam: siteConfig.PARAM
-                    };
-                }
-            }
-        });
-
         let averageRating = 0;
         if (totalPages > 0) averageRating = (totalRating / totalPages).toFixed(1);
 
+        // 构造头像链接
         const avatarUrl = userid ? `http://www.wikidot.com/avatar.php?userid=${userid}&timestamp=${Date.now()}` : `https://www.wikidot.com/avatar.php?account=${accountName}`;
 
         const authorData = {
