@@ -196,18 +196,30 @@ const AuthorProfile = () => {
                                             const siteConfig = config.SUPPORT_WIKI.find(w => w.WIKIT_ID === site.wiki || w.NAME === site.wiki);
                                             const siteName = siteConfig ? siteConfig.NAME : site.wiki;
                                             return (
-                                                <div key={index} className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                                                    <div className="font-medium text-indigo-400 mb-2 truncate" title={siteName}>{siteName}</div>
-                                                    <div className="text-sm text-gray-400 space-y-1">
-                                                        <div className="flex justify-between"><span>站点排名:</span> <span className="text-white font-medium">#{site.rank}</span></div>
-                                                        <div className="flex justify-between"><span>页面总数:</span> <span className="text-white">{site.count}</span></div>
-                                                        <div className="flex justify-between">
-                                                            <span>站点总分:</span> 
-                                                            <span className={`font-medium ${site.rating > 0 ? 'text-green-400' : site.rating < 0 ? 'text-red-400' : 'text-gray-300'}`}>
-                                                                {site.rating > 0 ? `+${site.rating}` : site.rating}
-                                                            </span>
+                                                <div key={index} className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 flex flex-col justify-between">
+                                                    <div>
+                                                        <div className="font-medium text-indigo-400 mb-2 truncate" title={siteName}>{siteName}</div>
+                                                        <div className="text-sm text-gray-400 space-y-1">
+                                                            <div className="flex justify-between"><span>站点排名:</span> <span className="text-white font-medium">#{site.rank}</span></div>
+                                                            <div className="flex justify-between"><span>页面总数:</span> <span className="text-white">{site.count}</span></div>
+                                                            <div className="flex justify-between">
+                                                                <span>站点总分:</span> 
+                                                                <span className={`font-medium ${site.rating > 0 ? 'text-green-400' : site.rating < 0 ? 'text-red-400' : 'text-gray-300'}`}>
+                                                                    {site.rating > 0 ? `+${site.rating}` : site.rating}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                    {site.authorPage && (
+                                                        <div className="mt-4 pt-3 border-t border-gray-700/50">
+                                                            <Link
+                                                                href={`/page?site=${site.authorPage.siteParam}&page=${encodeURIComponent(site.authorPage.page)}`}
+                                                                className="block w-full text-center text-xs py-1.5 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded hover:bg-indigo-600/30 transition-colors font-medium"
+                                                            >
+                                                                <i className="fa-solid fa-address-card mr-1"></i> 查看作者专属页
+                                                            </Link>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         })}
@@ -388,12 +400,12 @@ const AuthorProfile = () => {
                             
                             {search && displayedRankingList.length > 0 && (
                                 <div className="p-4 bg-gray-900/50 border-t border-gray-700 flex flex-col sm:flex-row items-center justify-center gap-3">
-                                    <span className="text-sm text-gray-400">以上是没有你想找的作者？</span>
+                                    <span className="text-sm text-gray-400">以上是没有找到想要的作者？（通常未上榜的新作者不会在这里显示）</span>
                                     <button 
                                         onClick={() => router.push(`/authors?name=${encodeURIComponent(search)}`)}
                                         className="text-sm px-4 py-1.5 bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded hover:bg-indigo-600/30 transition-colors"
                                     >
-                                        强制精确查找作者
+                                        强制精确查找主页
                                     </button>
                                 </div>
                             )}
