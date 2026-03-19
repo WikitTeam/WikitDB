@@ -308,11 +308,21 @@ const PageDetail = () => {
                                         </h3>
                                         <div className="min-w-[600px] relative">
                                             <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto drop-shadow-lg overflow-visible">
-                                                <line x1={padX} y1={zeroY} x2={svgWidth - padX} y2={zeroY} stroke="#4B5563" strokeWidth="1.5" strokeDasharray="6" />
-                                                <text x={padX - 10} y={zeroY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">0</text>
-                                                
-                                                {maxScore !== 0 && <text x={padX - 10} y={svgHeight - padY - (maxScore - minScore) * scaleY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">{maxScore}</text>}
-                                                {minScore !== 0 && <text x={padX - 10} y={svgHeight - padY - (minScore - minScore) * scaleY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">{minScore}</text>}
+<line x1={padX} y1={zeroY} x2={svgWidth - padX} y2={zeroY} stroke="#4B5563" strokeWidth="1.5" strokeDasharray="6" />
+<text x={padX - 10} y={zeroY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">0</text>
+
+{maxScore !== 0 && (
+    <g>
+        <line x1={padX} y1={svgHeight - padY - (maxScore - minScore) * scaleY} x2={svgWidth - padX} y2={svgHeight - padY - (maxScore - minScore) * scaleY} stroke="#374151" strokeWidth="1" strokeDasharray="4" />
+        <text x={padX - 10} y={svgHeight - padY - (maxScore - minScore) * scaleY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">{maxScore}</text>
+    </g>
+)}
+{minScore !== 0 && (
+    <g>
+        <line x1={padX} y1={svgHeight - padY} x2={svgWidth - padX} y2={svgHeight - padY} stroke="#374151" strokeWidth="1" strokeDasharray="4" />
+        <text x={padX - 10} y={svgHeight - padY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">{minScore}</text>
+    </g>
+)}
 
                                                 <polyline
                                                     fill="none"
