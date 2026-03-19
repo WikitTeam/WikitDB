@@ -79,10 +79,10 @@ const PageDetail = () => {
             date: item.date
         }));
         
-          if (chartData.length === 1) {
-            // 将初始起点设为与当前分数相同，画一条平稳的直线
+        if (chartData.length === 1) {
             chartData.unshift({ index: -1, score: chartData[0].score, date: '初始记录' });
         }
+    }
 
     const maxScore = chartData.length > 0 ? Math.max(...chartData.map(d => d.score)) : 0;
     const minScore = chartData.length > 0 ? Math.min(...chartData.map(d => d.score)) : 0;
@@ -307,21 +307,21 @@ const PageDetail = () => {
                                         </h3>
                                         <div className="min-w-[600px] relative">
                                             <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto drop-shadow-lg overflow-visible">
-<line x1={padX} y1={zeroY} x2={svgWidth - padX} y2={zeroY} stroke="#4B5563" strokeWidth="1.5" strokeDasharray="6" />
-<text x={padX - 10} y={zeroY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">0</text>
+                                                <line x1={padX} y1={zeroY} x2={svgWidth - padX} y2={zeroY} stroke="#4B5563" strokeWidth="1.5" strokeDasharray="6" />
+                                                <text x={padX - 10} y={zeroY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">0</text>
 
-{maxScore !== 0 && (
-    <g>
-        <line x1={padX} y1={svgHeight - padY - (maxScore - minScore) * scaleY} x2={svgWidth - padX} y2={svgHeight - padY - (maxScore - minScore) * scaleY} stroke="#374151" strokeWidth="1" strokeDasharray="4" />
-        <text x={padX - 10} y={svgHeight - padY - (maxScore - minScore) * scaleY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">{maxScore}</text>
-    </g>
-)}
-{minScore !== 0 && (
-    <g>
-        <line x1={padX} y1={svgHeight - padY} x2={svgWidth - padX} y2={svgHeight - padY} stroke="#374151" strokeWidth="1" strokeDasharray="4" />
-        <text x={padX - 10} y={svgHeight - padY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">{minScore}</text>
-    </g>
-)}
+                                                {maxScore !== 0 && (
+                                                    <g>
+                                                        <line x1={padX} y1={svgHeight - padY - (maxScore - minScore) * scaleY} x2={svgWidth - padX} y2={svgHeight - padY - (maxScore - minScore) * scaleY} stroke="#374151" strokeWidth="1" strokeDasharray="4" />
+                                                        <text x={padX - 10} y={svgHeight - padY - (maxScore - minScore) * scaleY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">{maxScore}</text>
+                                                    </g>
+                                                )}
+                                                {minScore !== 0 && (
+                                                    <g>
+                                                        <line x1={padX} y1={svgHeight - padY} x2={svgWidth - padX} y2={svgHeight - padY} stroke="#374151" strokeWidth="1" strokeDasharray="4" />
+                                                        <text x={padX - 10} y={svgHeight - padY + 4} fontSize="12" fill="#9CA3AF" textAnchor="end">{minScore}</text>
+                                                    </g>
+                                                )}
 
                                                 <polyline
                                                     fill="none"
