@@ -79,11 +79,10 @@ const PageDetail = () => {
             date: item.date
         }));
         
-        if (chartData.length === 1) {
-            // 强制将初始虚拟起点的分数设为0，制造视觉上的斜线
-            chartData.unshift({ index: -1, score: 0, date: '初始记录' });
+          if (chartData.length === 1) {
+            // 将初始起点设为与当前分数相同，画一条平稳的直线
+            chartData.unshift({ index: -1, score: chartData[0].score, date: '初始记录' });
         }
-    }
 
     const maxScore = chartData.length > 0 ? Math.max(...chartData.map(d => d.score)) : 0;
     const minScore = chartData.length > 0 ? Math.min(...chartData.map(d => d.score)) : 0;
