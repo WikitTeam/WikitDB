@@ -17,7 +17,7 @@
         "react": "18.2.0",
         "react-dom": "18.2.0",
         "tailwindcss": "^4.1.18",
-        "@vercel/kv": "latest"
+        "@upstash/redis": "latest"
     },
     "devDependencies": {
         "eslint": "8.51.0",
