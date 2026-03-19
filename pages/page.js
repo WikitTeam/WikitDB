@@ -96,11 +96,20 @@ const PageDetail = () => {
     const scaleY = (svgHeight - padY * 2) / rangeY;
     const zeroY = svgHeight - padY - (0 - minScore) * scaleY;
 
-    const polylinePoints = chartData.map((d, i) => {
-        const x = padX + i * scaleX;
-        const y = svgHeight - padY - (d.score - minScore) * scaleY;
-        return `${x},${y}`;
-    }).join(' ');
+    const createSmoothPath = () => {
+        if (chartData.length === 0) return '';
+        let path = `M ${padX},${svgHeight - padY - (chartData[0].score - minScore) * scaleY}`;
+        for (let i = 0; i < chartData.length - 1; i++) {
+            const currX = padX + i * scaleX;
+            const currY = svgHeight - padY - (chartData[i].score - minScore) * scaleY;
+            const nextX = padX + (i + 1) * scaleX;
+            const nextY = svgHeight - padY - (chartData[i + 1].score - minScore) * scaleY;
+            const cpX = (currX + nextX) / 2;
+            path += ` C ${cpX},${currY} ${cpX},${nextY} ${nextX},${nextY}`;
+        }
+        return path;
+    };
+    const smoothPathD = createSmoothPath();
 
     return (
         <>
@@ -323,13 +332,13 @@ const PageDetail = () => {
                                                     </g>
                                                 )}
 
-                                                <polyline
+                                                <path
+                                                    d={smoothPathD}
                                                     fill="none"
                                                     stroke="#818CF8" 
                                                     strokeWidth="3"
                                                     strokeLinecap="round"
                                                     strokeLinejoin="round"
-                                                    points={polylinePoints}
                                                     className="drop-shadow-[0_0_8px_rgba(129,140,248,0.5)]"
                                                 />
                                                 
