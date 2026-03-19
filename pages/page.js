@@ -80,7 +80,8 @@ const PageDetail = () => {
         }));
         
         if (chartData.length === 1) {
-            chartData.unshift({ index: -1, score: chartData[0].score, date: '开始记录' });
+            // 强制将初始虚拟起点的分数设为0，制造视觉上的斜线
+            chartData.unshift({ index: -1, score: 0, date: '初始记录' });
         }
     }
 
