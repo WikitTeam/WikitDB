@@ -87,6 +87,7 @@ const PageDetail = () => {
     const maxScore = chartData.length > 0 ? Math.max(...chartData.map(d => d.score)) : 0;
     const minScore = chartData.length > 0 ? Math.min(...chartData.map(d => d.score)) : 0;
     
+    // 强制按 10 分一档计算刻度
     const gridMin = Math.floor(Math.min(minScore, 0) / 10) * 10;
     const gridMax = Math.ceil(Math.max(maxScore, 0) / 10) * 10;
     const rangeY = Math.max(gridMax - gridMin, 1);
@@ -99,7 +100,9 @@ const PageDetail = () => {
     const scaleY = (svgHeight - padY * 2) / rangeY;
     
     const getY = (val) => svgHeight - padY - (val - gridMin) * scaleY;
+    const zeroY = getY(0);
     
+    // 动态判断是否为负分走势，用于切换红色/蓝色主题
     const isNegative = chartData.length > 0 && chartData[chartData.length - 1].score < 0;
     const themeColor = isNegative ? '#F87171' : '#818CF8';
     const shadowClass = isNegative 
@@ -111,7 +114,7 @@ const PageDetail = () => {
         gridLines.push(i);
     }
 
-    // 纯粹的直连线条
+    // 最标准的直连折线 (点到点直接相连，真实反映每日涨跌幅度)
     const createLinePath = () => {
         if (chartData.length === 0) return '';
         let path = `M ${padX},${getY(chartData[0].score)}`;
@@ -123,6 +126,20 @@ const PageDetail = () => {
         return path;
     };
     const linePathD = createLinePath();
+
+    // 匹配直连折线的面积填充 (严格向0分线闭合)
+    const createAreaPath = () => {
+        if (chartData.length === 0) return '';
+        let path = `M ${padX},${zeroY} L ${padX},${getY(chartData[0].score)}`;
+        for (let i = 1; i < chartData.length; i++) {
+            const x = padX + i * scaleX;
+            const y = getY(chartData[i].score);
+            path += ` L ${x},${y}`;
+        }
+        path += ` L ${padX + (chartData.length - 1) * scaleX},${zeroY} Z`;
+        return path;
+    };
+    const areaPathD = createAreaPath();
 
     return (
         <>
@@ -329,6 +346,13 @@ const PageDetail = () => {
                                         </h3>
                                         <div className="min-w-[600px] relative">
                                             <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto drop-shadow-lg overflow-visible">
+                                                <defs>
+                                                    <linearGradient id="areaGradient" x1="0" y1={isNegative ? "1" : "0"} x2="0" y2={isNegative ? "0" : "1"}>
+                                                        <stop offset="0%" stopColor={themeColor} stopOpacity="0.5" />
+                                                        <stop offset="100%" stopColor={themeColor} stopOpacity="0" />
+                                                    </linearGradient>
+                                                </defs>
+
                                                 {gridLines.map((val) => {
                                                     const y = getY(val);
                                                     const isZero = val === 0;
@@ -339,6 +363,12 @@ const PageDetail = () => {
                                                         </g>
                                                     );
                                                 })}
+
+                                                <path
+                                                    d={areaPathD}
+                                                    fill="url(#areaGradient)"
+                                                    className="transition-all duration-300"
+                                                />
 
                                                 <path
                                                     d={linePathD}
