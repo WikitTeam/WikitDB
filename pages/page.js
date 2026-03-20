@@ -102,7 +102,8 @@ const PageDetail = () => {
             date: item.date
         }));
         
-        if (chartData.length === 1) {
+        // 如果只有一个数据点，或者为了展示"记录前"的灰色基准线，我们在最前面插入一个初始记录
+        if (chartData.length >= 1 && chartData[0].date !== '初始记录') {
             chartData.unshift({ score: chartData[0].score, date: '初始记录' });
         }
     }
@@ -110,6 +111,7 @@ const PageDetail = () => {
     const isNegative = chartData.length > 0 && chartData[chartData.length - 1].score < 0;
     const themeColor = isNegative ? 'rgba(248, 113, 113, 1)' : 'rgba(129, 140, 248, 1)';
     const bgColorFallback = isNegative ? 'rgba(248, 113, 113, 0.2)' : 'rgba(129, 140, 248, 0.2)';
+    const grayColor = 'rgba(107, 114, 128, 1)'; // 灰色，用于记录前的数据
 
     const lineChartData = {
         labels: chartData.map(d => d.date),
@@ -119,7 +121,6 @@ const PageDetail = () => {
                 label: '页面评分',
                 data: chartData.map(d => d.score),
                 borderColor: themeColor,
-                // 使用真正的 Canvas 线性渐变填充，还原原站视觉效果
                 backgroundColor: (context) => {
                     const chart = context.chart;
                     const { ctx, chartArea } = chart;
@@ -130,8 +131,18 @@ const PageDetail = () => {
                     return gradient;
                 },
                 borderWidth: 3,
-                tension: 0.4, // 恢复 0.4 的平滑曲线，这才是你截图里线的真实形状
-                pointBackgroundColor: themeColor,
+                
+                // 核心修复1：使用 'before' 阶梯线（上来后直线走），杜绝所有夸张的曲线幅度
+                stepped: 'before', 
+                
+                // 核心修复2：记录之前的数据（第一段）变成灰色虚线
+                segment: {
+                    borderColor: ctx => ctx.p0DataIndex === 0 ? grayColor : themeColor,
+                    borderDash: ctx => ctx.p0DataIndex === 0 ? [6, 6] : undefined,
+                },
+                
+                // 第一颗点（初始记录）也变成灰色
+                pointBackgroundColor: (ctx) => ctx.dataIndex === 0 ? grayColor : themeColor,
                 pointBorderColor: '#1F2937',
                 pointBorderWidth: 1.5,
                 pointRadius: 4,
@@ -154,7 +165,7 @@ const PageDetail = () => {
         scales: {
             y: {
                 ticks: {
-                    precision: 0, // 核心修复：强制 Y 轴只显示整数，绝不出现 1.5 分
+                    precision: 0, // 强制 Y 轴只显示整数
                     color: '#9CA3AF',
                     font: { size: 12 }
                 },
