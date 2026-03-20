@@ -17,7 +17,6 @@ import { Line } from 'react-chartjs-2';
 
 const config = require('../wikitdb.config.js');
 
-// 注册 Chart.js 组件
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -96,7 +95,6 @@ const PageDetail = () => {
 
     if (!data) return null;
 
-    // 整理 Chart.js 需要的数据格式
     let chartData = [];
     if (data.scoreHistory && data.scoreHistory.length > 0) {
         chartData = data.scoreHistory.map((item) => ({
@@ -109,22 +107,30 @@ const PageDetail = () => {
         }
     }
 
-    // 判断当前是否为负分走势，设置对应的主题色
     const isNegative = chartData.length > 0 && chartData[chartData.length - 1].score < 0;
-    const themeColor = isNegative ? 'rgba(248, 113, 113, 1)' : 'rgba(129, 140, 248, 1)'; // 红色或蓝色
-    const bgColor = isNegative ? 'rgba(248, 113, 113, 0.2)' : 'rgba(129, 140, 248, 0.2)';
+    const themeColor = isNegative ? 'rgba(248, 113, 113, 1)' : 'rgba(129, 140, 248, 1)';
+    const bgColorFallback = isNegative ? 'rgba(248, 113, 113, 0.2)' : 'rgba(129, 140, 248, 0.2)';
 
     const lineChartData = {
         labels: chartData.map(d => d.date),
         datasets: [
             {
-                fill: 'origin', // 严格填充至 0 分线（X轴）
+                fill: 'origin',
                 label: '页面评分',
                 data: chartData.map(d => d.score),
                 borderColor: themeColor,
-                backgroundColor: bgColor,
+                // 使用真正的 Canvas 线性渐变填充，还原原站视觉效果
+                backgroundColor: (context) => {
+                    const chart = context.chart;
+                    const { ctx, chartArea } = chart;
+                    if (!chartArea) return bgColorFallback;
+                    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                    gradient.addColorStop(0, isNegative ? 'rgba(248, 113, 113, 0.5)' : 'rgba(129, 140, 248, 0.5)');
+                    gradient.addColorStop(1, isNegative ? 'rgba(248, 113, 113, 0)' : 'rgba(129, 140, 248, 0)');
+                    return gradient;
+                },
                 borderWidth: 3,
-                tension: 0, // 0 表示点到点直线相连，没有自作主张的曲线
+                tension: 0.4, // 恢复 0.4 的平滑曲线，这才是你截图里线的真实形状
                 pointBackgroundColor: themeColor,
                 pointBorderColor: '#1F2937',
                 pointBorderWidth: 1.5,
@@ -148,7 +154,7 @@ const PageDetail = () => {
         scales: {
             y: {
                 ticks: {
-                    stepSize: 10, // 强制 10 分一档
+                    precision: 0, // 核心修复：强制 Y 轴只显示整数，绝不出现 1.5 分
                     color: '#9CA3AF',
                     font: { size: 12 }
                 },
@@ -161,17 +167,17 @@ const PageDetail = () => {
             x: {
                 ticks: {
                     color: '#9CA3AF',
-                    maxTicksLimit: 8, // 防止日期文字过多重叠
+                    maxTicksLimit: 8,
                     font: { size: 10 }
                 },
                 grid: {
-                    display: false // 隐藏垂直网格线，使其更整洁
+                    display: false
                 }
             }
         },
         plugins: {
             legend: {
-                display: false // 隐藏顶部图例
+                display: false
             },
             tooltip: {
                 backgroundColor: '#111827',
@@ -180,7 +186,7 @@ const PageDetail = () => {
                 borderColor: '#374151',
                 borderWidth: 1,
                 padding: 10,
-                displayColors: false, // 隐藏 Tooltip 里的小方块色标
+                displayColors: false,
                 callbacks: {
                     label: function(context) {
                         let val = context.parsed.y;
@@ -397,7 +403,6 @@ const PageDetail = () => {
                                     <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
                                         <i className="fa-solid fa-chart-line text-indigo-400"></i> 按日评分走势
                                     </h3>
-                                    {/* 这里是将原生 SVG 替换为 Chart.js 组件的地方 */}
                                     <div className="w-full h-[320px] relative">
                                         <Line data={lineChartData} options={lineChartOptions} />
                                     </div>
