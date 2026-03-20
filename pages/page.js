@@ -118,21 +118,20 @@ const PageDetail = () => {
     };
     const stepPathD = createStepPath();
 
-    const createAreaPath = () => {
+    const createStepAreaPath = () => {
         if (chartData.length === 0) return '';
         const baseY = svgHeight - padY;
-        let path = `M ${padX},${baseY} `;
-        path += `L ${padX},${getY(chartData[0].score)} `;
+        let path = `M ${padX},${baseY} L ${padX},${getY(chartData[0].score)}`;
         for (let i = 1; i < chartData.length; i++) {
             const nextX = padX + i * scaleX;
             const prevY = getY(chartData[i - 1].score);
             const nextY = getY(chartData[i].score);
-            path += `L ${nextX},${prevY} L ${nextX},${nextY} `;
+            path += ` L ${nextX},${prevY} L ${nextX},${nextY}`;
         }
-        path += `L ${padX + (chartData.length - 1) * scaleX},${baseY} Z`;
+        path += ` L ${padX + (chartData.length - 1) * scaleX},${baseY} Z`;
         return path;
     };
-    const areaPathD = createAreaPath();
+    const areaPathD = createStepAreaPath();
 
     return (
         <>
