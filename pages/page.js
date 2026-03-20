@@ -102,6 +102,7 @@ const PageDetail = () => {
             date: item.date
         }));
         
+        // 插入初始记录点
         if (chartData.length >= 1 && chartData[0].date !== '初始记录') {
             chartData.unshift({ score: chartData[0].score, date: '初始记录' });
         }
@@ -116,31 +117,43 @@ const PageDetail = () => {
         labels: chartData.map(d => d.date),
         datasets: [
             {
-                fill: 'origin',
+                fill: 'origin', // 关键：填充到 0 分线
                 label: '页面评分',
                 data: chartData.map(d => d.score),
                 borderColor: themeColor,
                 backgroundColor: (context) => {
                     const chart = context.chart;
-                    const { ctx, chartArea } = chart;
+                    const { ctx, chartArea, scales } = chart;
                     if (!chartArea) return bgColorFallback;
+                    
+                    const zeroY = scales.y.getPixelForValue(0);
+                    const zeroRatio = (zeroY - chartArea.top) / (chartArea.bottom - chartArea.top);
+                    const safeZero = Math.max(0, Math.min(1, zeroRatio));
+                    
                     const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
-                    gradient.addColorStop(0, isNegative ? 'rgba(248, 113, 113, 0.5)' : 'rgba(129, 140, 248, 0.5)');
-                    gradient.addColorStop(1, isNegative ? 'rgba(248, 113, 113, 0)' : 'rgba(129, 140, 248, 0)');
+                    
+                    if (isNegative) {
+                        // 负分：0分线（透明）向下到底部（红色）
+                        gradient.addColorStop(safeZero, 'rgba(248, 113, 113, 0)');
+                        gradient.addColorStop(1, 'rgba(248, 113, 113, 0.5)');
+                    } else {
+                        // 正分：顶部（蓝色）向下到0分线（透明）
+                        gradient.addColorStop(0, 'rgba(129, 140, 248, 0.5)');
+                        gradient.addColorStop(safeZero, 'rgba(129, 140, 248, 0)');
+                    }
                     return gradient;
                 },
                 borderWidth: 3,
                 
-                // 彻底去掉平滑曲线和阶梯，回归最自然的点到点直连
-                tension: 0,
+                // 画阶梯线：先跳跃，后平走
+                stepped: 'before',
                 
-                // 初始记录线段变为灰色虚线
+                // 第一段使用灰色虚线
                 segment: {
                     borderColor: ctx => ctx.p0DataIndex === 0 ? grayColor : themeColor,
                     borderDash: ctx => ctx.p0DataIndex === 0 ? [6, 6] : undefined,
                 },
                 
-                // 初始记录的点变为灰色
                 pointBackgroundColor: (ctx) => ctx.dataIndex === 0 ? grayColor : themeColor,
                 pointBorderColor: '#1F2937',
                 pointBorderWidth: 1.5,
@@ -154,17 +167,16 @@ const PageDetail = () => {
         responsive: true,
         maintainAspectRatio: false,
         layout: {
-            padding: {
-                top: 20,
-                bottom: 20,
-                left: 10,
-                right: 20
-            }
+            padding: { top: 20, bottom: 20, left: 10, right: 20 }
         },
         scales: {
             y: {
+                // 强制 Y 轴永远包含 0，防止负分阴影断裂
+                suggestedMin: 0,
+                suggestedMax: 0,
                 ticks: {
-                    precision: 0, 
+                    precision: 0, // 强制整数，去掉小数点
+                    stepSize: 10, // 强制 10 分一档
                     color: '#9CA3AF',
                     font: { size: 12 }
                 },
