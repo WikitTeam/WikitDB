@@ -110,7 +110,7 @@ const PageDetail = () => {
     const isNegative = chartData.length > 0 && chartData[chartData.length - 1].score < 0;
     const themeColor = isNegative ? 'rgba(248, 113, 113, 1)' : 'rgba(129, 140, 248, 1)';
     const bgColorFallback = isNegative ? 'rgba(248, 113, 113, 0.2)' : 'rgba(129, 140, 248, 0.2)';
-    const grayColor = 'rgba(107, 114, 128, 1)'; // 用于初始记录的灰色
+    const grayColor = 'rgba(107, 114, 128, 1)';
 
     const lineChartData = {
         labels: chartData.map(d => d.date),
@@ -131,15 +131,16 @@ const PageDetail = () => {
                 },
                 borderWidth: 3,
                 
-                // 核心：严格遵循“先向上然后再长”的自然阶梯感
-                stepped: 'before',
+                // 彻底去掉平滑曲线和阶梯，回归最自然的点到点直连
+                tension: 0,
                 
-                // 将“初始记录”到第一天的数据线段染成灰色，表明那是正式记录前的状态
+                // 初始记录线段变为灰色虚线
                 segment: {
                     borderColor: ctx => ctx.p0DataIndex === 0 ? grayColor : themeColor,
+                    borderDash: ctx => ctx.p0DataIndex === 0 ? [6, 6] : undefined,
                 },
                 
-                // 初始点也对应变为灰色
+                // 初始记录的点变为灰色
                 pointBackgroundColor: (ctx) => ctx.dataIndex === 0 ? grayColor : themeColor,
                 pointBorderColor: '#1F2937',
                 pointBorderWidth: 1.5,
