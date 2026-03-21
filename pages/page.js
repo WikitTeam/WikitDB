@@ -37,6 +37,9 @@ const PageDetail = () => {
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('源码');
 
+    const [hpage, setHpage] = useState(1);
+    const [historyLoading, setHistoryLoading] = useState(false);
+
     const tabs = ['源码', '信息', '历史', '评分'];
 
     const fetchPageData = async (signal) => {
@@ -45,7 +48,7 @@ const PageDetail = () => {
         setError(null);
         
         try {
-            const apiUrl = `/api/page?site=${site}&page=${encodeURIComponent(page)}`;
+            const apiUrl = `/api/page?site=${site}&page=${encodeURIComponent(page)}&hpage=${hpage}`;
             const fetchOptions = signal ? { signal } : {};
             const res = await fetch(apiUrl, fetchOptions);
             const result = await res.json();
@@ -67,6 +70,22 @@ const PageDetail = () => {
                 setLoading(false);
             }
         }
+    };
+
+    const loadHistoryPage = async (newPage) => {
+        if (newPage < 1) return;
+        setHistoryLoading(true);
+        try {
+            const res = await fetch(`/api/page?site=${site}&page=${encodeURIComponent(page)}&hpage=${newPage}`);
+            const result = await res.json();
+            if (res.ok) {
+                setData(prev => ({ ...prev, historyHtml: result.historyHtml }));
+                setHpage(newPage);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+        setHistoryLoading(false);
     };
 
     useEffect(() => {
@@ -102,7 +121,6 @@ const PageDetail = () => {
             date: item.date
         }));
         
-        // 核心机制：确保所有走势必须从 0 分开始，形成自然的上涨/下跌斜坡
         if (chartData[0].date === '初始记录') {
             chartData[0].score = 0;
         } else {
@@ -119,7 +137,7 @@ const PageDetail = () => {
         labels: chartData.map(d => d.date),
         datasets: [
             {
-                fill: 'origin', // 严格填充至 0 分线
+                fill: 'origin',
                 label: '页面评分',
                 data: chartData.map(d => d.score),
                 borderColor: themeColor,
@@ -134,16 +152,13 @@ const PageDetail = () => {
                     
                     const gradient = ctx.createLinearGradient(0, topY, 0, bottomY);
                     
-                    // 精确计算 0 分线在画布中的百分比位置
                     const zeroRatio = Math.max(0, Math.min(1, (zeroY - topY) / (bottomY - topY)));
                     
                     if (isNegative) {
-                        // 负分图表：从 0 分线（透明）向下到底部折线（红）
                         gradient.addColorStop(0, 'rgba(248, 113, 113, 0)');
                         gradient.addColorStop(zeroRatio, 'rgba(248, 113, 113, 0)');
                         gradient.addColorStop(1, 'rgba(248, 113, 113, 0.5)');
                     } else {
-                        // 正分图表：从顶部折线（蓝）向下到 0 分线（透明）
                         gradient.addColorStop(0, 'rgba(129, 140, 248, 0.5)');
                         gradient.addColorStop(zeroRatio, 'rgba(129, 140, 248, 0)');
                         gradient.addColorStop(1, 'rgba(129, 140, 248, 0)');
@@ -151,18 +166,12 @@ const PageDetail = () => {
                     return gradient;
                 },
                 borderWidth: 3,
-                
-                // 回归最自然直观的对角直线走势，彻底摒弃阶梯线
                 tension: 0,
                 stepped: false,
-                
-                // 第一段（从 0 分初始记录爬坡/跌落的过程）设为灰色虚线
                 segment: {
                     borderColor: ctx => ctx.p0DataIndex === 0 ? grayColor : themeColor,
                     borderDash: ctx => ctx.p0DataIndex === 0 ? [6, 6] : undefined,
                 },
-                
-                // 起点颜色对应灰色
                 pointBackgroundColor: (ctx) => ctx.dataIndex === 0 ? grayColor : themeColor,
                 pointBorderColor: '#1F2937',
                 pointBorderWidth: 1.5,
@@ -180,7 +189,6 @@ const PageDetail = () => {
         },
         scales: {
             y: {
-                // 必须锁死，强制显示 0 分线，确保阴影有所依附
                 suggestedMin: 0,
                 suggestedMax: 0,
                 ticks: {
@@ -410,18 +418,42 @@ const PageDetail = () => {
                     )}
 
                     {activeTab === '历史' && (
-                        <div className="bg-gray-900/50 p-0 rounded-lg overflow-x-auto border border-gray-700">
-                            <div 
-                                className="w-full text-sm text-gray-300 
-                                [&_table]:w-full [&_table]:text-left [&_table]:border-collapse [&_table]:min-w-max
-                                [&_th]:p-4 [&_th]:font-medium [&_th]:text-gray-400 [&_th]:border-b [&_th]:border-gray-700 [&_th]:bg-gray-800/50
-                                [&_td]:p-4 [&_td]:border-b [&_td]:border-gray-700/50
-                                [&_tr:last-child_td]:border-b-0
-                                [&_tr:hover_td]:bg-gray-800/80 [&_tr]:transition-colors
-                                [&_img]:inline-block [&_img]:w-5 [&_img]:h-5 [&_img]:rounded-full [&_img]:mr-2 [&_img]:align-middle [&_img]:object-cover [&_img]:border [&_img]:border-gray-600
-                                [&_a]:text-indigo-400 [&_a:hover]:text-indigo-300 [&_a]:transition-colors"
-                                dangerouslySetInnerHTML={{ __html: data.historyHtml }}
-                            />
+                        <div className="space-y-4">
+                            <div className="bg-gray-900/50 p-0 rounded-lg overflow-x-auto border border-gray-700 relative">
+                                {historyLoading && (
+                                    <div className="absolute inset-0 bg-gray-900/60 flex items-center justify-center z-10">
+                                        <span className="text-gray-300">加载中...</span>
+                                    </div>
+                                )}
+                                <div 
+                                    className="w-full text-sm text-gray-300 
+                                    [&_table]:w-full [&_table]:text-left [&_table]:border-collapse [&_table]:min-w-max
+                                    [&_th]:p-4 [&_th]:font-medium [&_th]:text-gray-400 [&_th]:border-b [&_th]:border-gray-700 [&_th]:bg-gray-800/50
+                                    [&_td]:p-4 [&_td]:border-b [&_td]:border-gray-700/50
+                                    [&_tr:last-child_td]:border-b-0
+                                    [&_tr:hover_td]:bg-gray-800/80 [&_tr]:transition-colors
+                                    [&_img]:inline-block [&_img]:w-5 [&_img]:h-5 [&_img]:rounded-full [&_img]:mr-2 [&_img]:align-middle [&_img]:object-cover [&_img]:border [&_img]:border-gray-600
+                                    [&_a]:text-indigo-400 [&_a:hover]:text-indigo-300 [&_a]:transition-colors"
+                                    dangerouslySetInnerHTML={{ __html: data.historyHtml }}
+                                />
+                            </div>
+                            <div className="flex justify-between items-center bg-gray-900/30 p-3 rounded-lg border border-gray-700">
+                                <button 
+                                    onClick={() => loadHistoryPage(hpage - 1)}
+                                    disabled={hpage <= 1 || historyLoading}
+                                    className="px-4 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    上一页
+                                </button>
+                                <span className="text-gray-400 text-sm">第 {hpage} 页</span>
+                                <button 
+                                    onClick={() => loadHistoryPage(hpage + 1)}
+                                    disabled={historyLoading}
+                                    className="px-4 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    下一页
+                                </button>
+                            </div>
                         </div>
                     )}
 
