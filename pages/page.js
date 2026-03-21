@@ -102,8 +102,12 @@ const PageDetail = () => {
             date: item.date
         }));
         
-        if (chartData.length >= 1 && chartData[0].date !== '初始记录') {
-            chartData.unshift({ score: chartData[0].score, date: '初始记录' });
+        // 核心机制修复：无论高分还是低分，强制把第一根线的起点定死在 0 分。
+        // 这样负分图表也会有一条从 0 掉落的灰色起始虚线。
+        if (chartData[0].date === '初始记录') {
+            chartData[0].score = 0;
+        } else {
+            chartData.unshift({ score: 0, date: '初始记录' });
         }
     }
 
@@ -132,28 +136,20 @@ const PageDetail = () => {
                     const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
                     
                     if (isNegative) {
-                        // 负分：0分线（透明）向下到底部（红色）
                         gradient.addColorStop(safeZero, 'rgba(248, 113, 113, 0)');
                         gradient.addColorStop(1, 'rgba(248, 113, 113, 0.5)');
                     } else {
-                        // 正分：顶部（蓝色）向下到0分线（透明）
                         gradient.addColorStop(0, 'rgba(129, 140, 248, 0.5)');
                         gradient.addColorStop(safeZero, 'rgba(129, 140, 248, 0)');
                     }
                     return gradient;
                 },
                 borderWidth: 3,
-                
-                // 彻底去掉平滑曲线和阶梯，回归最自然的点到点直连
-                tension: 0,
-                
-                // 初始记录线段变为灰色虚线
+                tension: 0, // 恢复自然直连斜线，不搞阶梯
                 segment: {
                     borderColor: ctx => ctx.p0DataIndex === 0 ? grayColor : themeColor,
                     borderDash: ctx => ctx.p0DataIndex === 0 ? [6, 6] : undefined,
                 },
-                
-                // 初始记录的点变为灰色
                 pointBackgroundColor: (ctx) => ctx.dataIndex === 0 ? grayColor : themeColor,
                 pointBorderColor: '#1F2937',
                 pointBorderWidth: 1.5,
@@ -167,20 +163,15 @@ const PageDetail = () => {
         responsive: true,
         maintainAspectRatio: false,
         layout: {
-            padding: {
-                top: 20,
-                bottom: 20,
-                left: 10,
-                right: 20
-            }
+            padding: { top: 20, bottom: 20, left: 10, right: 20 }
         },
         scales: {
             y: {
-                // 强制包含 0 分线，确保纯负分或纯正分走势阴影不断层
-                suggestedMax: 0,
                 suggestedMin: 0,
+                suggestedMax: 0,
                 ticks: {
                     precision: 0, 
+                    stepSize: 10, 
                     color: '#9CA3AF',
                     font: { size: 12 }
                 },
@@ -202,9 +193,7 @@ const PageDetail = () => {
             }
         },
         plugins: {
-            legend: {
-                display: false
-            },
+            legend: { display: false },
             tooltip: {
                 backgroundColor: '#111827',
                 titleColor: '#9CA3AF',
