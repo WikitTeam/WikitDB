@@ -102,8 +102,7 @@ const PageDetail = () => {
             date: item.date
         }));
         
-        // 核心机制修复：无论高分还是低分，强制把第一根线的起点定死在 0 分。
-        // 这样负分图表也会有一条从 0 掉落的灰色起始虚线。
+        // 核心机制：确保所有走势必须从 0 分开始，形成自然的上涨/下跌斜坡
         if (chartData[0].date === '初始记录') {
             chartData[0].score = 0;
         } else {
@@ -120,7 +119,7 @@ const PageDetail = () => {
         labels: chartData.map(d => d.date),
         datasets: [
             {
-                fill: 'origin',
+                fill: 'origin', // 严格填充至 0 分线
                 label: '页面评分',
                 data: chartData.map(d => d.score),
                 borderColor: themeColor,
@@ -130,26 +129,40 @@ const PageDetail = () => {
                     if (!chartArea) return bgColorFallback;
                     
                     const zeroY = scales.y.getPixelForValue(0);
-                    const zeroRatio = (zeroY - chartArea.top) / (chartArea.bottom - chartArea.top);
-                    const safeZero = Math.max(0, Math.min(1, zeroRatio));
+                    const topY = chartArea.top;
+                    const bottomY = chartArea.bottom;
                     
-                    const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+                    const gradient = ctx.createLinearGradient(0, topY, 0, bottomY);
+                    
+                    // 精确计算 0 分线在画布中的百分比位置
+                    const zeroRatio = Math.max(0, Math.min(1, (zeroY - topY) / (bottomY - topY)));
                     
                     if (isNegative) {
-                        gradient.addColorStop(safeZero, 'rgba(248, 113, 113, 0)');
+                        // 负分图表：从 0 分线（透明）向下到底部折线（红）
+                        gradient.addColorStop(0, 'rgba(248, 113, 113, 0)');
+                        gradient.addColorStop(zeroRatio, 'rgba(248, 113, 113, 0)');
                         gradient.addColorStop(1, 'rgba(248, 113, 113, 0.5)');
                     } else {
+                        // 正分图表：从顶部折线（蓝）向下到 0 分线（透明）
                         gradient.addColorStop(0, 'rgba(129, 140, 248, 0.5)');
-                        gradient.addColorStop(safeZero, 'rgba(129, 140, 248, 0)');
+                        gradient.addColorStop(zeroRatio, 'rgba(129, 140, 248, 0)');
+                        gradient.addColorStop(1, 'rgba(129, 140, 248, 0)');
                     }
                     return gradient;
                 },
                 borderWidth: 3,
-                tension: 0, // 恢复自然直连斜线，不搞阶梯
+                
+                // 回归最自然直观的对角直线走势，彻底摒弃阶梯线
+                tension: 0,
+                stepped: false,
+                
+                // 第一段（从 0 分初始记录爬坡/跌落的过程）设为灰色虚线
                 segment: {
                     borderColor: ctx => ctx.p0DataIndex === 0 ? grayColor : themeColor,
                     borderDash: ctx => ctx.p0DataIndex === 0 ? [6, 6] : undefined,
                 },
+                
+                // 起点颜色对应灰色
                 pointBackgroundColor: (ctx) => ctx.dataIndex === 0 ? grayColor : themeColor,
                 pointBorderColor: '#1F2937',
                 pointBorderWidth: 1.5,
@@ -167,6 +180,7 @@ const PageDetail = () => {
         },
         scales: {
             y: {
+                // 必须锁死，强制显示 0 分线，确保阴影有所依附
                 suggestedMin: 0,
                 suggestedMax: 0,
                 ticks: {
