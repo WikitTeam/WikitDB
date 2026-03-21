@@ -8,7 +8,7 @@ const redis = new Redis({
 });
 
 export default async function handler(req, res) {
-    const { site, page } = req.query;
+    const { site, page, hpage = 1 } = req.query;
 
     if (!site || !page || page === 'undefined') {
         return res.status(400).json({ error: '缺少有效的 site 或 page 参数' });
@@ -139,38 +139,42 @@ export default async function handler(req, res) {
         let wikitHistoryFailed = false; 
         let wikitRawJson = null;
 
-        try {
-            const wikitHistUrl = `https://wikit.unitreaty.org/wikidot/pagehistory?wiki=${actualWikiName}&page=${encodeURIComponent(secureUrl)}`;
-            const histRes = await fetch(wikitHistUrl, {
-                method: 'GET',
-                headers: { 'User-Agent': fetchHeaders['User-Agent'] },
-                cache: 'no-store'
-            });
-            
-            if (histRes.ok) {
-                const histText = await histRes.text();
-                try {
-                    const histJson = JSON.parse(histText);
-                    if (histJson.error || Array.isArray(histJson)) {
-                        wikitHistoryFailed = true;
-                    } else if (histJson.body || histJson.html) {
-                        historyHtml = histJson.body || histJson.html;
-                    } else {
-                        wikitHistoryFailed = true;
-                        wikitRawJson = histJson;
+        if (hpage == 1) {
+            try {
+                const wikitHistUrl = `https://wikit.unitreaty.org/wikidot/pagehistory?wiki=${actualWikiName}&page=${encodeURIComponent(secureUrl)}`;
+                const histRes = await fetch(wikitHistUrl, {
+                    method: 'GET',
+                    headers: { 'User-Agent': fetchHeaders['User-Agent'] },
+                    cache: 'no-store'
+                });
+                
+                if (histRes.ok) {
+                    const histText = await histRes.text();
+                    try {
+                        const histJson = JSON.parse(histText);
+                        if (histJson.error || Array.isArray(histJson)) {
+                            wikitHistoryFailed = true;
+                        } else if (histJson.body || histJson.html) {
+                            historyHtml = histJson.body || histJson.html;
+                        } else {
+                            wikitHistoryFailed = true;
+                            wikitRawJson = histJson;
+                        }
+                    } catch (e) {
+                        if (histText.includes('<html') || histText.includes('<table')) {
+                            const $hist = cheerio.load(histText);
+                            historyHtml = $hist('table.page-history').length ? $hist('table.page-history').parent().html() : $hist('body').html() || histText;
+                        } else {
+                            historyHtml = histText;
+                        }
                     }
-                } catch (e) {
-                    if (histText.includes('<html') || histText.includes('<table')) {
-                        const $hist = cheerio.load(histText);
-                        historyHtml = $hist('table.page-history').length ? $hist('table.page-history').parent().html() : $hist('body').html() || histText;
-                    } else {
-                        historyHtml = histText;
-                    }
+                } else {
+                    wikitHistoryFailed = true;
                 }
-            } else {
+            } catch (e) {
                 wikitHistoryFailed = true;
             }
-        } catch (e) {
+        } else {
             wikitHistoryFailed = true;
         }
 
@@ -219,7 +223,7 @@ export default async function handler(req, res) {
                     fetch(ajaxUrl, {
                         method: 'POST',
                         headers: ajaxHeaders,
-                        body: `page_id=${pageId}&moduleName=history/PageRevisionListModule&page=1&perpage=50&wikidot_token7=123456`,
+                        body: `page_id=${pageId}&moduleName=history/PageRevisionListModule&page=${hpage}&perpage=50&wikidot_token7=123456`,
                         cache: 'no-store'
                     })
                 );
