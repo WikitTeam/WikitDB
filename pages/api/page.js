@@ -328,8 +328,27 @@ export default async function handler(req, res) {
             }
         }
 
+        let maxHistoryPage = 1;
+
         if (historyHtml && !historyHtml.startsWith('{')) {
             const $hist = cheerio.load(historyHtml, null, false);
+            
+            // 解析原站自带的翻页器，获取最大页数限制
+            const pagerText = $hist('.pager .pager-no').text();
+            const match = pagerText.match(/of\s+(\d+)|共\s*(\d+)\s*页|\/\s*(\d+)/i);
+            if (match) {
+                maxHistoryPage = parseInt(match[1] || match[2] || match[3], 10);
+            } else {
+                $hist('.pager .target a').each((i, el) => {
+                    const pageNum = parseInt($hist(el).text(), 10);
+                    if (!isNaN(pageNum) && pageNum > maxHistoryPage) {
+                        maxHistoryPage = pageNum;
+                    }
+                });
+            }
+
+            // 彻底移除原站残留的 HTML 翻页器，避免它显示在表格上方
+            $hist('.pager').remove();
             
             const lastRow = $hist('table.page-history tr').last();
             if (lastRow.length > 0) {
@@ -406,6 +425,7 @@ export default async function handler(req, res) {
             lastUpdated: lastUpdated,
             sourceCode: sourceCode,
             historyHtml: historyHtml,
+            maxHistoryPage: maxHistoryPage,
             pageId: pageId,
             ratingTable: ratingTable,
             scoreHistory: scoreHistory
