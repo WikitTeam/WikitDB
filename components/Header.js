@@ -10,7 +10,6 @@ const Header = () => {
             <div className="mx-auto max-w-7xl px-2 sm:px-6 lg:px-8">
                 <div className="relative flex h-16 items-center justify-between">
                     <div className="absolute inset-y-0 left-0 flex items-center sm:hidden">
-                        {/* 替换原有的无用属性，绑定 onClick 事件 */}
                         <button 
                             type="button" 
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -18,7 +17,6 @@ const Header = () => {
                         >
                             <span className="absolute -inset-0.5"></span>
                             <span className="sr-only">打开顶栏</span>
-                            {/* 根据状态切换图标 */}
                             {isMobileMenuOpen ? (
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className="size-6">
                                     <path d="M6 18 18 6M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
@@ -31,12 +29,13 @@ const Header = () => {
                         </button>
                     </div>
                     <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
-                        <a href="/" className="flex shrink-0 items-center">
-                            <img src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=500" alt="logo" className="h-8 w-auto" />
-                            <span className="px-1.5 font-bold text-white">{config.SITE_NAME}</span>
+                        {/* 核心修复区：调整 Logo 路径与大小，增加间距和清晰度 */}
+                        <a href="/" className="flex shrink-0 items-center gap-2.5">
+                            <img src="/img/logo.png" alt="WikitDB Logo" className="h-10 w-10 object-contain drop-shadow-md" />
+                            <span className="font-bold text-white text-lg tracking-wide">{config.SITE_NAME}</span>
                         </a>
                         <div className="hidden sm:ml-6 sm:block">
-                            <div className="flex space-x-4">
+                            <div className="flex space-x-4 items-center h-full">
                                 <a href="/pages" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white">页面</a>
                                 <a href="/authors" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white">作者</a>
                                 <a href="/tools" className="rounded-md px-3 py-2 text-sm font-medium text-gray-300 hover:bg-white/5 hover:text-white">工具</a>
@@ -47,7 +46,7 @@ const Header = () => {
                 </div>
             </div>
 
-            {/* 移动端下拉菜单：通过状态控制 display */}
+            {/* 移动端下拉菜单 */}
             <div className={`${isMobileMenuOpen ? 'block' : 'hidden'} sm:hidden`} id="mobile-menu">
                 <div className="space-y-1 px-2 pt-2 pb-3">
                     <div className="grid grid-cols-2 gap-2">
