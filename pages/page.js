@@ -38,6 +38,7 @@ const PageDetail = () => {
     const [activeTab, setActiveTab] = useState('源码');
 
     const [hpage, setHpage] = useState(1);
+    const [maxHpage, setMaxHpage] = useState(1);
     const [historyLoading, setHistoryLoading] = useState(false);
 
     const tabs = ['源码', '信息', '历史', '评分'];
@@ -59,6 +60,7 @@ const PageDetail = () => {
             
             if (!signal || !signal.aborted) {
                 setData(result);
+                if (result.maxHistoryPage) setMaxHpage(result.maxHistoryPage);
             }
         } catch (err) {
             if (err.name === 'AbortError') return;
@@ -73,7 +75,7 @@ const PageDetail = () => {
     };
 
     const loadHistoryPage = async (newPage) => {
-        if (newPage < 1) return;
+        if (newPage < 1 || newPage > maxHpage) return;
         setHistoryLoading(true);
         try {
             const res = await fetch(`/api/page?site=${site}&page=${encodeURIComponent(page)}&hpage=${newPage}`);
@@ -81,6 +83,7 @@ const PageDetail = () => {
             if (res.ok) {
                 setData(prev => ({ ...prev, historyHtml: result.historyHtml }));
                 setHpage(newPage);
+                if (result.maxHistoryPage) setMaxHpage(result.maxHistoryPage);
             }
         } catch (err) {
             console.error(err);
@@ -445,10 +448,10 @@ const PageDetail = () => {
                                 >
                                     上一页
                                 </button>
-                                <span className="text-gray-400 text-sm">第 {hpage} 页</span>
+                                <span className="text-gray-400 text-sm">第 {hpage} / {maxHpage || 1} 页</span>
                                 <button 
                                     onClick={() => loadHistoryPage(hpage + 1)}
-                                    disabled={historyLoading}
+                                    disabled={historyLoading || hpage >= (maxHpage || 1)}
                                     className="px-4 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     下一页
