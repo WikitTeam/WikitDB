@@ -75,7 +75,7 @@ const PageDetail = () => {
     };
 
     const loadHistoryPage = async (newPage) => {
-        if (newPage < 1 || newPage > maxHpage) return;
+        if (newPage < 1 || newPage > maxHpage || newPage === hpage) return;
         setHistoryLoading(true);
         try {
             const res = await fetch(`/api/page?site=${site}&page=${encodeURIComponent(page)}&hpage=${newPage}`);
@@ -440,22 +440,66 @@ const PageDetail = () => {
                                     dangerouslySetInnerHTML={{ __html: data.historyHtml }}
                                 />
                             </div>
-                            <div className="flex justify-between items-center bg-gray-900/30 p-3 rounded-lg border border-gray-700">
-                                <button 
-                                    onClick={() => loadHistoryPage(hpage - 1)}
-                                    disabled={hpage <= 1 || historyLoading}
-                                    className="px-4 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    上一页
-                                </button>
-                                <span className="text-gray-400 text-sm">第 {hpage} / {maxHpage || 1} 页</span>
-                                <button 
-                                    onClick={() => loadHistoryPage(hpage + 1)}
-                                    disabled={historyLoading || hpage >= (maxHpage || 1)}
-                                    className="px-4 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    下一页
-                                </button>
+                            <div className="flex flex-wrap justify-between items-center bg-gray-900/30 p-3 rounded-lg border border-gray-700 gap-4">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <button 
+                                        onClick={() => loadHistoryPage(hpage - 1)}
+                                        disabled={hpage <= 1 || historyLoading}
+                                        className="px-3 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        上一页
+                                    </button>
+                                    
+                                    {Array.from({ length: maxHpage || 1 }, (_, i) => i + 1).map(pageNum => (
+                                        <button
+                                            key={pageNum}
+                                            onClick={() => loadHistoryPage(pageNum)}
+                                            disabled={historyLoading}
+                                            className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                                                hpage === pageNum
+                                                    ? 'bg-indigo-600 text-white cursor-default'
+                                                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                                            }`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    ))}
+
+                                    <button 
+                                        onClick={() => loadHistoryPage(hpage + 1)}
+                                        disabled={historyLoading || hpage >= (maxHpage || 1)}
+                                        className="px-3 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        下一页
+                                    </button>
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                    <span className="text-gray-400 text-sm">共 {maxHpage || 1} 页，跳至</span>
+                                    <input 
+                                        type="number" 
+                                        min="1" 
+                                        max={maxHpage || 1}
+                                        className="w-16 px-2 py-1 text-sm bg-gray-800 border border-gray-600 rounded text-gray-300 focus:outline-none focus:border-indigo-500"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                const val = parseInt(e.target.value);
+                                                if (!isNaN(val)) loadHistoryPage(val);
+                                            }
+                                        }}
+                                        id="pageJumpInput"
+                                    />
+                                    <button 
+                                        onClick={() => {
+                                            const val = parseInt(document.getElementById('pageJumpInput').value);
+                                            if (!isNaN(val)) loadHistoryPage(val);
+                                        }}
+                                        disabled={historyLoading}
+                                        className="px-3 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        跳转
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     )}
