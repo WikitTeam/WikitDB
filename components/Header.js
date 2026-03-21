@@ -1,6 +1,24 @@
 import React, { useState } from 'react';
 const config = require('../wikitdb.config.js');
 
+// 高清矢量 Logo 组件，直接在代码中定义，保证绝对清晰
+const HighDefLogoSVG = ({ className }) => (
+    <svg viewBox="0 0 100 100" className={className}>
+        <g transform="translate(10,10)">
+            {/* 绿松石块 (Turquoise, #34747B) */}
+            <path d="M0 0 L 20 0 L 15 25 L 0 20 Z" fill="#34747B" />
+            {/* 深蓝块 (Navy blue, #1C3D6A) */}
+            <path d="M 25 -5 L 45 5 L 40 30 L 25 25 L 20 20 Z" fill="#1C3D6A" />
+            {/* 橙红块 (Orange-red, #E0524F) */}
+            <path d="M 30 35 L 50 45 L 45 70 L 30 65 L 25 60 Z" fill="#E0524F" />
+            {/* 三个点 (Points) */}
+            <circle cx="65" cy="20" r="3" fill="#9CA3AF" />
+            <circle cx="65" cy="40" r="3" fill="#9CA3AF" />
+            <circle cx="65" cy="60" r="3" fill="#9CA3AF" />
+        </g>
+    </svg>
+);
+
 const Header = () => {
     // 使用 React 状态管理移动端菜单的展开/收起
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -29,9 +47,9 @@ const Header = () => {
                         </button>
                     </div>
                     <div className="flex flex-1 items-center justify-center sm:items-stretch sm:justify-start">
-                        {/* 核心修复区：调整 Logo 路径与大小，增加间距和清晰度 */}
+                        {/* 核心修复区：彻底替换模糊的<img>，使用高清矢量SVG */}
                         <a href="/" className="flex shrink-0 items-center gap-2.5">
-                            <img src="/img/logo.png" alt="WikitDB Logo" className="h-10 w-10 object-contain drop-shadow-md" />
+                            <HighDefLogoSVG className="h-10 w-10 drop-shadow-md" />
                             <span className="font-bold text-white text-lg tracking-wide">{config.SITE_NAME}</span>
                         </a>
                         <div className="hidden sm:ml-6 sm:block">
