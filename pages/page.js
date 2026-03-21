@@ -102,7 +102,7 @@ const PageDetail = () => {
             date: item.date
         }));
         
-        // 核心机制：确保所有走势必须从 0 分开始，形成自然的上涨/下跌斜坡
+        // 强制所有走势从 0 分起步，保留起始的自然斜坡
         if (chartData[0].date === '初始记录') {
             chartData[0].score = 0;
         } else {
@@ -119,7 +119,7 @@ const PageDetail = () => {
         labels: chartData.map(d => d.date),
         datasets: [
             {
-                fill: 'origin', // 严格填充至 0 分线
+                fill: 'origin', // 阴影严格对齐 0 分线
                 label: '页面评分',
                 data: chartData.map(d => d.score),
                 borderColor: themeColor,
@@ -133,8 +133,6 @@ const PageDetail = () => {
                     const bottomY = chartArea.bottom;
                     
                     const gradient = ctx.createLinearGradient(0, topY, 0, bottomY);
-                    
-                    // 精确计算 0 分线在画布中的百分比位置
                     const zeroRatio = Math.max(0, Math.min(1, (zeroY - topY) / (bottomY - topY)));
                     
                     if (isNegative) {
@@ -152,17 +150,16 @@ const PageDetail = () => {
                 },
                 borderWidth: 3,
                 
-                // 回归最自然直观的对角直线走势，彻底摒弃阶梯线
-                tension: 0,
+                // 核心修复：单调立方插值算法，保证像人手画一样平滑，且绝不夸张回弹
+                tension: 0.4,
+                cubicInterpolationMode: 'monotone',
                 stepped: false,
                 
-                // 第一段（从 0 分初始记录爬坡/跌落的过程）设为灰色虚线
                 segment: {
                     borderColor: ctx => ctx.p0DataIndex === 0 ? grayColor : themeColor,
                     borderDash: ctx => ctx.p0DataIndex === 0 ? [6, 6] : undefined,
                 },
                 
-                // 起点颜色对应灰色
                 pointBackgroundColor: (ctx) => ctx.dataIndex === 0 ? grayColor : themeColor,
                 pointBorderColor: '#1F2937',
                 pointBorderWidth: 1.5,
@@ -180,7 +177,6 @@ const PageDetail = () => {
         },
         scales: {
             y: {
-                // 必须锁死，强制显示 0 分线，确保阴影有所依附
                 suggestedMin: 0,
                 suggestedMax: 0,
                 ticks: {
