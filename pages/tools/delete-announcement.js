@@ -15,15 +15,22 @@ const DeleteAnnouncement = () => {
     const [deletedPages, setDeletedPages] = useState([]);
     const [isCheckingDeleted, setIsCheckingDeleted] = useState(false);
 
-    // 批量抓取状态
+    // 标签抓取状态 (去除了无用的 URL 批量导入逻辑)
     const [showBatchModal, setShowBatchModal] = useState(false);
-    const [batchTab, setBatchTab] = useState('urls'); 
-    const [batchInput, setBatchInput] = useState('');
     const [tagInput, setTagInput] = useState('待删除');
     const [isBatchFetching, setIsBatchFetching] = useState(false);
-    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
 
     const [generatedCode, setGeneratedCode] = useState('');
+
+    // 格式化时间的辅助函数，拦截 1970 年
+    const formatValidDate = (dateStr) => {
+        if (!dateStr) return '未知时间';
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime()) || d.getFullYear() <= 1970) {
+            return '未知时间';
+        }
+        return d.toLocaleString('zh-CN', { hour12: false });
+    };
 
     // 监听站点切换，自动查询 deleted: 分类
     useEffect(() => {
@@ -70,7 +77,7 @@ const DeleteAnnouncement = () => {
                                 siteName: wikiConfig.NAME,
                                 creatorName: node.author || '未知',
                                 rating: node.rating || 0,
-                                lastUpdated: node.created_at ? new Date(node.created_at).toLocaleString('zh-CN', { hour12: false }) : '未知时间'
+                                lastUpdated: formatValidDate(node.created_at)
                             };
                         });
                         setDeletedPages(formatted);
@@ -114,6 +121,13 @@ const DeleteAnnouncement = () => {
         const res = await fetch(`/api/page?site=${siteParam}&page=${encodeURIComponent(pageName)}`);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '抓取失败');
+        
+        if (data.lastUpdated) {
+            const d = new Date(data.lastUpdated.replace(/\//g, '-'));
+            if (!isNaN(d.getTime()) && d.getFullYear() <= 1970) {
+                data.lastUpdated = '未知时间';
+            }
+        }
         return data;
     };
 
@@ -135,33 +149,6 @@ const DeleteAnnouncement = () => {
         } finally {
             setIsFetchingSingle(false);
         }
-    };
-
-    const handleBatchUrls = async () => {
-        const lines = batchInput.split('\n').map(l => l.trim()).filter(l => l);
-        if (lines.length === 0) return;
-
-        setIsBatchFetching(true);
-        setBatchProgress({ current: 0, total: lines.length });
-
-        const newPages = [];
-        for (let i = 0; i < lines.length; i++) {
-            try {
-                const { site, page } = parseInputStr(lines[i]);
-                const data = await fetchPageData(site, page);
-                if (!pagesList.find(p => p.originalUrl === data.originalUrl) && !newPages.find(p => p.originalUrl === data.originalUrl)) {
-                    newPages.push(data);
-                }
-            } catch (err) {
-                console.error(`无法抓取 ${lines[i]}:`, err);
-            }
-            setBatchProgress({ current: i + 1, total: lines.length });
-        }
-
-        setPagesList(prev => [...prev, ...newPages]);
-        setIsBatchFetching(false);
-        setShowBatchModal(false);
-        setBatchInput('');
     };
 
     const handleBatchTags = async () => {
@@ -207,7 +194,7 @@ const DeleteAnnouncement = () => {
                         siteName: wikiConfig.NAME,
                         creatorName: node.author || '未知',
                         rating: node.rating || 0,
-                        lastUpdated: node.created_at ? new Date(node.created_at).toLocaleString('zh-CN', { hour12: false }) : '未知时间'
+                        lastUpdated: formatValidDate(node.created_at)
                     });
                 }
             });
@@ -286,7 +273,7 @@ const DeleteAnnouncement = () => {
                         页面自动删除公告生成器
                     </h1>
                     <p className="text-gray-400 mt-2 text-sm">
-                        快速生成符合 Wikidot 格式的低分/违规页面删除公告代码。支持单页抓取、URL批量导入以及按标签全自动抓取。
+                        快速生成符合 Wikidot 格式的低分/违规页面删除公告代码。支持单页抓取以及按标签全自动抓取。
                     </p>
                 </div>
 
@@ -359,7 +346,7 @@ const DeleteAnnouncement = () => {
                         onClick={() => setShowBatchModal(true)}
                         className="px-4 py-2.5 bg-gray-700 text-gray-200 font-medium rounded-lg hover:bg-gray-600 transition-colors shrink-0 flex items-center justify-center gap-2"
                     >
-                        <i className="fa-solid fa-list-ul"></i> 批量 / 标签抓取
+                        <i className="fa-solid fa-tags"></i> 按标签批量抓取
                     </button>
                 </div>
 
@@ -452,24 +439,12 @@ const DeleteAnnouncement = () => {
                 </div>
             </div>
 
+            {/* 纯净版：按标签抓取模态框 */}
             {showBatchModal && (
                 <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
                     <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
                         <div className="px-6 py-4 border-b border-gray-700 flex justify-between items-center bg-gray-900/50">
-                            <div className="flex space-x-4">
-                                <button 
-                                    onClick={() => setBatchTab('urls')}
-                                    className={`text-sm font-bold pb-1 border-b-2 transition-colors ${batchTab === 'urls' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
-                                >
-                                    URL 批量导入
-                                </button>
-                                <button 
-                                    onClick={() => setBatchTab('tags')}
-                                    className={`text-sm font-bold pb-1 border-b-2 transition-colors ${batchTab === 'tags' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
-                                >
-                                    按标签自动抓取
-                                </button>
-                            </div>
+                            <h3 className="text-lg font-bold text-white">按标签自动抓取</h3>
                             {!isBatchFetching && (
                                 <button onClick={() => setShowBatchModal(false)} className="text-gray-400 hover:text-white">
                                     <i className="fa-solid fa-xmark text-xl"></i>
@@ -478,69 +453,27 @@ const DeleteAnnouncement = () => {
                         </div>
                         
                         <div className="p-6">
-                            {batchTab === 'urls' ? (
-                                <>
-                                    <p className="text-sm text-gray-400 mb-3">
-                                        支持直接粘贴页面 URL（每行一个），系统将自动识别站点并逐个抓取信息。
-                                    </p>
-                                    <textarea
-                                        className="w-full h-40 bg-gray-900 border border-gray-600 text-gray-300 rounded-lg p-3 text-sm focus:outline-none focus:border-indigo-500 resize-none"
-                                        placeholder="http://scp-wiki-cn.wikidot.com/scp-cn-xxxx&#10;http://forest-literature-club.wikidot.com/test-page"
-                                        value={batchInput}
-                                        onChange={(e) => setBatchInput(e.target.value)}
-                                        disabled={isBatchFetching}
-                                    ></textarea>
-                                    
-                                    {isBatchFetching && (
-                                        <div className="mt-4">
-                                            <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                                <span>抓取进度</span>
-                                                <span>{batchProgress.current} / {batchProgress.total}</span>
-                                            </div>
-                                            <div className="w-full bg-gray-700 rounded-full h-2">
-                                                <div 
-                                                    className="bg-indigo-500 h-2 rounded-full transition-all duration-300" 
-                                                    style={{ width: `${(batchProgress.current / Math.max(1, batchProgress.total)) * 100}%` }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <>
-                                    <p className="text-sm text-gray-400 mb-4">
-                                        直接调用 Wikit GraphQL 接口，瞬间提取指定站点下带有特定标签的所有页面。
-                                    </p>
-                                    
-                                    <div className="space-y-4">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-400 mb-1">目标站点</label>
-                                            <select 
-                                                className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 outline-none"
-                                                value={selectedSite}
-                                                onChange={(e) => setSelectedSite(e.target.value)}
-                                                disabled={isBatchFetching}
-                                            >
-                                                {wikis.map(wiki => (
-                                                    <option key={wiki.PARAM} value={wiki.PARAM}>{wiki.NAME}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-400 mb-1">抓取标签</label>
-                                            <input
-                                                type="text"
-                                                value={tagInput}
-                                                onChange={(e) => setTagInput(e.target.value)}
-                                                disabled={isBatchFetching}
-                                                className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5"
-                                                placeholder="例如: 待删除, 原创"
-                                            />
-                                        </div>
-                                    </div>
-                                </>
-                            )}
+                            <p className="text-sm text-gray-400 mb-4">
+                                直接调用 Wikit GraphQL 接口，瞬间提取当前选中站点（<strong className="text-white">{wikis.find(w => w.PARAM === selectedSite)?.NAME}</strong>）下带有特定标签的所有页面。
+                            </p>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">输入抓取标签</label>
+                                <input
+                                    type="text"
+                                    value={tagInput}
+                                    onChange={(e) => setTagInput(e.target.value)}
+                                    disabled={isBatchFetching}
+                                    className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5"
+                                    placeholder="例如: 待删除, 原创"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            if (!isBatchFetching && tagInput.trim()) handleBatchTags();
+                                        }
+                                    }}
+                                />
+                            </div>
                         </div>
                         
                         <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-700 flex justify-end gap-3">
@@ -552,13 +485,13 @@ const DeleteAnnouncement = () => {
                                 取消
                             </button>
                             <button 
-                                onClick={batchTab === 'urls' ? handleBatchUrls : handleBatchTags}
-                                disabled={isBatchFetching || (batchTab === 'urls' && !batchInput.trim()) || (batchTab === 'tags' && !tagInput.trim())}
+                                onClick={handleBatchTags}
+                                disabled={isBatchFetching || !tagInput.trim()}
                                 className="px-4 py-2 text-sm bg-indigo-600 text-white font-medium rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center"
                             >
                                 {isBatchFetching ? (
                                     <><i className="fa-solid fa-circle-notch fa-spin mr-2"></i> 抓取中...</>
-                                ) : (batchTab === 'urls' ? '开始排队抓取' : '立即全自动抓取')}
+                                ) : '立即全自动抓取'}
                             </button>
                         </div>
                     </div>
