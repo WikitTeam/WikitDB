@@ -9,7 +9,9 @@ const DeleteAnnouncement = () => {
     const [selectedSite, setSelectedSite] = useState(wikis.length > 0 ? wikis[0].PARAM : '');
     const [tagInput, setTagInput] = useState('待删除');
     const [pagesList, setPagesList] = useState([]);
+    const [isFetchingSingle, setIsFetchingSingle] = useState(false);
     const [isBatchFetching, setIsBatchFetching] = useState(false);
+    const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
     
     // 自动检查 deleted: 分类的状态
     const [deletedPages, setDeletedPages] = useState([]);
@@ -72,7 +74,8 @@ const DeleteAnnouncement = () => {
                                 siteName: wikiConfig.NAME,
                                 creatorName: node.author || '未知',
                                 rating: node.rating || 0,
-                                lastUpdated: formatValidDate(node.created_at)
+                                lastUpdated: formatValidDate(node.created_at),
+                                sourceCode: '' // 自删页面不需要源码
                             };
                         });
                         setDeletedPages(formatted);
@@ -90,12 +93,70 @@ const DeleteAnnouncement = () => {
         return () => { isMounted = false; };
     }, [selectedSite, wikis]);
 
-    // 按标签自动抓取页面
+    // 解析输入的 URL 或页面名
+    const parseInputStr = (inputStr) => {
+        let site = selectedSite;
+        let page = inputStr.trim();
+        
+        if (page.startsWith('http')) {
+            try {
+                const url = new URL(page);
+                const host = url.hostname;
+                const path = url.pathname.substring(1);
+                
+                const matchedSite = wikis.find(w => {
+                    try { return new URL(w.URL).hostname === host; } catch(e) { return false; }
+                });
+                
+                if (matchedSite) site = matchedSite.PARAM;
+                page = path;
+            } catch (e) {}
+        }
+        return { site, page };
+    };
+
+    const fetchPageData = async (siteParam, pageName) => {
+        const res = await fetch(`/api/page?site=${siteParam}&page=${encodeURIComponent(pageName)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || '抓取失败');
+        
+        if (data.lastUpdated) {
+            const d = new Date(data.lastUpdated.replace(/\//g, '-'));
+            if (!isNaN(d.getTime()) && d.getFullYear() <= 1970) {
+                data.lastUpdated = '未知时间';
+            }
+        }
+        return data;
+    };
+
+    const handleSingleAdd = async (e) => {
+        e.preventDefault();
+        if (!searchInput.trim() || !selectedSite) return;
+        
+        setIsFetchingSingle(true);
+        try {
+            const { site, page } = parseInputStr(searchInput);
+            const data = await fetchPageData(site, page);
+            
+            if (!pagesList.find(p => p.originalUrl === data.originalUrl)) {
+                setPagesList(prev => [...prev, data]);
+            }
+            setSearchInput('');
+        } catch (err) {
+            alert(`抓取失败: ${err.message}`);
+        } finally {
+            setIsFetchingSingle(false);
+        }
+    };
+
+    // 按标签自动抓取页面（包含源码抓取进度）
     const handleTagFetch = async (e) => {
         if (e) e.preventDefault();
         if (!tagInput.trim() || !selectedSite) return;
         
         setIsBatchFetching(true);
+        setBatchProgress({ current: 0, total: 0 });
+        
         try {
             const wikiConfig = wikis.find(w => w.PARAM === selectedSite);
             let actualWikiName = '';
@@ -125,26 +186,45 @@ const DeleteAnnouncement = () => {
                 return;
             }
 
+            setBatchProgress({ current: 0, total: nodes.length });
             const newPages = [];
-            nodes.forEach(node => {
+            
+            for (let i = 0; i < nodes.length; i++) {
+                const node = nodes[i];
                 const originalUrl = `${wikiConfig.URL.replace(/\/$/, '')}/${node.page}`;
+                
                 if (!pagesList.find(p => p.originalUrl === originalUrl)) {
-                    newPages.push({
+                    let fullData = {
                         title: node.title || node.page,
                         originalUrl: originalUrl,
                         siteName: wikiConfig.NAME,
                         creatorName: node.author || '未知',
                         rating: node.rating || 0,
-                        lastUpdated: formatValidDate(node.created_at)
-                    });
+                        lastUpdated: formatValidDate(node.created_at),
+                        sourceCode: '[[源码获取失败，请手动补充]]'
+                    };
+                    
+                    try {
+                        const pageData = await fetchPageData(selectedSite, node.page);
+                        if (pageData.sourceCode) {
+                            fullData.sourceCode = pageData.sourceCode;
+                        }
+                    } catch (err) {
+                        console.error(`无法抓取 ${node.page} 的源码:`, err);
+                    }
+                    
+                    newPages.push(fullData);
                 }
-            });
+                
+                setBatchProgress({ current: i + 1, total: nodes.length });
+            }
             
             setPagesList(prev => [...prev, ...newPages]);
         } catch (err) {
             alert(`标签抓取失败: ${err.message}`);
         } finally {
             setIsBatchFetching(false);
+            setBatchProgress({ current: 0, total: 0 });
         }
     };
 
@@ -152,39 +232,48 @@ const DeleteAnnouncement = () => {
         setPagesList(prev => prev.filter((_, index) => index !== indexToRemove));
     };
 
+    // 生成符合新格式的代码
     const generateCode = () => {
         if (pagesList.length === 0) {
             setGeneratedCode('请先添加至少一个页面。');
             return;
         }
 
-        let code = `[[div class="deletion-announcement"]]\n`;
-        code += `**本周低分/违规页面删除公示**\n\n`;
-        code += `以下页面因评分低于阈值或违反站点规定，将于近期执行删除操作。请原作者及时备份。\n\n`;
-        code += `[[table class="wiki-content-table"]]\n`;
-        code += `[[row]]\n`;
-        code += `[[hcell]] 页面标题 [[/hcell]]\n`;
-        code += `[[hcell]] 原作者 [[/hcell]]\n`;
-        code += `[[hcell]] 当前评分 [[/hcell]]\n`;
-        code += `[[/row]]\n`;
+        const selfDeletedPages = [];
+        const lowScorePages = [];
 
         pagesList.forEach(p => {
-            const title = p.title || '未知页面';
-            const url = p.originalUrl;
-            const author = p.creatorName || '未知';
-            const rating = p.rating || 0;
-            
-            code += `[[row]]\n`;
-            code += `[[cell]] [[[${url} | ${title}]]] [[/cell]]\n`;
-            code += `[[cell]] [[*user ${author}]] [[/cell]]\n`;
-            code += `[[cell]] ${rating > 0 ? '+' + rating : rating} [[/cell]]\n`;
-            code += `[[/row]]\n`;
+            // 如果页面带 deleted: 前缀，归类为原作者自删
+            if (p.title.startsWith('deleted:') || p.originalUrl.includes('/deleted:')) {
+                selfDeletedPages.push(p);
+            } else {
+                lowScorePages.push(p);
+            }
         });
 
-        code += `[[/table]]\n`;
-        code += `[[/div]]`;
+        let code = '';
 
-        setGeneratedCode(code);
+        if (selfDeletedPages.length > 0) {
+            code += `直接删除原作者自删的页面：\n`;
+            selfDeletedPages.forEach(p => {
+                code += `${p.originalUrl}\n`;
+            });
+            code += `\n\n`;
+        }
+
+        lowScorePages.forEach(p => {
+            const title = p.title || '未知页面';
+            const rating = p.rating || 0;
+            const sourceCode = p.sourceCode || '[[无可用源码，请手动补充]]';
+            
+            code += `由于发布删除宣告时本页面已处于 [宣告分数] 的低分，现已跌至 ${rating} 分，且在宣告删除后的 [24/72] 小时内无异议，故删除「${title}」。[[collapsible show="+ 页面源代码" hide="- 收起"]]\n`;
+            code += `[[code]]\n`;
+            code += `${sourceCode}\n`;
+            code += `[[/code]]\n`;
+            code += `[[/collapsible]]\n\n`;
+        });
+
+        setGeneratedCode(code.trim());
     };
 
     const copyToClipboard = () => {
@@ -212,7 +301,7 @@ const DeleteAnnouncement = () => {
                         页面自动删除公告生成器
                     </h1>
                     <p className="text-gray-400 mt-2 text-sm">
-                        快速生成符合 Wikidot 格式的低分/违规页面删除公告代码。直接输入标签一键抓取全部相关页面。
+                        自动识别“自删页面”和“低分删除页面”，并一键生成包含完整源代码折叠块的 Wikidot 格式公告。
                     </p>
                 </div>
 
@@ -249,23 +338,44 @@ const DeleteAnnouncement = () => {
                     </div>
                 )}
 
+                {/* 搜索添加与标签抓取表单 */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-6 bg-gray-800/50 p-4 rounded-xl border border-white/5">
+                    <form onSubmit={handleSingleAdd} className="flex-1 flex flex-col sm:flex-row gap-3 border-b sm:border-b-0 sm:border-r border-gray-700 pb-4 sm:pb-0 sm:pr-4">
+                        <div className="relative flex-1">
+                            <input
+                                type="text"
+                                placeholder="输入页面 URL 或英文名..."
+                                value={searchInput}
+                                onChange={(e) => setSearchInput(e.target.value)}
+                                disabled={isFetchingSingle || isBatchFetching}
+                                className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 px-4 disabled:opacity-50"
+                            />
+                        </div>
+                        <button 
+                            type="submit"
+                            disabled={isFetchingSingle || isBatchFetching || !searchInput.trim()}
+                            className="px-4 py-2.5 bg-gray-700 text-gray-200 font-medium rounded-lg hover:bg-gray-600 disabled:opacity-50 transition-colors shrink-0"
+                        >
+                            {isFetchingSingle ? '添加中...' : '单独添加'}
+                        </button>
+                    </form>
+                    
                     <form onSubmit={handleTagFetch} className="flex-1 flex flex-col sm:flex-row gap-3">
                         <div className="relative flex-1">
                             <input
                                 type="text"
-                                placeholder="输入抓取标签 (例如: 待删除, 原创)..."
+                                placeholder="输入抓取标签 (如: 待删除)..."
                                 value={tagInput}
                                 onChange={(e) => setTagInput(e.target.value)}
-                                disabled={isBatchFetching}
+                                disabled={isBatchFetching || isFetchingSingle}
                                 className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 px-4 disabled:opacity-50"
                             />
                         </div>
                         <select 
-                            className="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 sm:w-48 outline-none"
+                            className="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 sm:w-36 outline-none"
                             value={selectedSite}
                             onChange={(e) => setSelectedSite(e.target.value)}
-                            disabled={isBatchFetching}
+                            disabled={isBatchFetching || isFetchingSingle}
                         >
                             {wikis.map(wiki => (
                                 <option key={wiki.PARAM} value={wiki.PARAM}>{wiki.NAME}</option>
@@ -273,10 +383,10 @@ const DeleteAnnouncement = () => {
                         </select>
                         <button 
                             type="submit"
-                            disabled={isBatchFetching || !tagInput.trim()}
-                            className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors shrink-0"
+                            disabled={isBatchFetching || isFetchingSingle || !tagInput.trim()}
+                            className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors shrink-0"
                         >
-                            {isBatchFetching ? '抓取中...' : '按标签抓取'}
+                            {isBatchFetching ? `抓取中... ${batchProgress.total > 0 ? `(${batchProgress.current}/${batchProgress.total})` : ''}` : '按标签抓取'}
                         </button>
                     </form>
                 </div>
@@ -330,7 +440,7 @@ const DeleteAnnouncement = () => {
                                         <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
                                             <div className="flex flex-col items-center">
                                                 <i className="fa-solid fa-inbox text-4xl mb-3 opacity-50"></i>
-                                                列表为空，请在上方输入标签提取页面
+                                                列表为空，请在上方添加页面
                                             </div>
                                         </td>
                                     </tr>
