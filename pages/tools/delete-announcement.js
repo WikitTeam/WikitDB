@@ -7,18 +7,13 @@ const DeleteAnnouncement = () => {
     const wikis = config.SUPPORT_WIKI || config.SUPPOST_WIKI || [];
     
     const [selectedSite, setSelectedSite] = useState(wikis.length > 0 ? wikis[0].PARAM : '');
-    const [searchInput, setSearchInput] = useState('');
+    const [tagInput, setTagInput] = useState('待删除');
     const [pagesList, setPagesList] = useState([]);
-    const [isFetchingSingle, setIsFetchingSingle] = useState(false);
+    const [isBatchFetching, setIsBatchFetching] = useState(false);
     
     // 自动检查 deleted: 分类的状态
     const [deletedPages, setDeletedPages] = useState([]);
     const [isCheckingDeleted, setIsCheckingDeleted] = useState(false);
-
-    // 标签抓取状态 (去除了无用的 URL 批量导入逻辑)
-    const [showBatchModal, setShowBatchModal] = useState(false);
-    const [tagInput, setTagInput] = useState('待删除');
-    const [isBatchFetching, setIsBatchFetching] = useState(false);
 
     const [generatedCode, setGeneratedCode] = useState('');
 
@@ -95,63 +90,9 @@ const DeleteAnnouncement = () => {
         return () => { isMounted = false; };
     }, [selectedSite, wikis]);
 
-    // 解析输入的 URL 或页面名
-    const parseInputStr = (inputStr) => {
-        let site = selectedSite;
-        let page = inputStr.trim();
-        
-        if (page.startsWith('http')) {
-            try {
-                const url = new URL(page);
-                const host = url.hostname;
-                const path = url.pathname.substring(1);
-                
-                const matchedSite = wikis.find(w => {
-                    try { return new URL(w.URL).hostname === host; } catch(e) { return false; }
-                });
-                
-                if (matchedSite) site = matchedSite.PARAM;
-                page = path;
-            } catch (e) {}
-        }
-        return { site, page };
-    };
-
-    const fetchPageData = async (siteParam, pageName) => {
-        const res = await fetch(`/api/page?site=${siteParam}&page=${encodeURIComponent(pageName)}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || '抓取失败');
-        
-        if (data.lastUpdated) {
-            const d = new Date(data.lastUpdated.replace(/\//g, '-'));
-            if (!isNaN(d.getTime()) && d.getFullYear() <= 1970) {
-                data.lastUpdated = '未知时间';
-            }
-        }
-        return data;
-    };
-
-    const handleSingleAdd = async (e) => {
-        e.preventDefault();
-        if (!searchInput.trim() || !selectedSite) return;
-        
-        setIsFetchingSingle(true);
-        try {
-            const { site, page } = parseInputStr(searchInput);
-            const data = await fetchPageData(site, page);
-            
-            if (!pagesList.find(p => p.originalUrl === data.originalUrl)) {
-                setPagesList(prev => [...prev, data]);
-            }
-            setSearchInput('');
-        } catch (err) {
-            alert(`抓取失败: ${err.message}`);
-        } finally {
-            setIsFetchingSingle(false);
-        }
-    };
-
-    const handleBatchTags = async () => {
+    // 按标签自动抓取页面
+    const handleTagFetch = async (e) => {
+        if (e) e.preventDefault();
         if (!tagInput.trim() || !selectedSite) return;
         
         setIsBatchFetching(true);
@@ -161,7 +102,7 @@ const DeleteAnnouncement = () => {
             if (wikiConfig) {
                 try {
                     actualWikiName = new URL(wikiConfig.URL).hostname.replace(/^www\./i, '').split('.')[0];
-                } catch (e) {
+                } catch (err) {
                     actualWikiName = wikiConfig.URL.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('.')[0];
                 }
             }
@@ -200,8 +141,6 @@ const DeleteAnnouncement = () => {
             });
             
             setPagesList(prev => [...prev, ...newPages]);
-            setShowBatchModal(false);
-            setTagInput('待删除');
         } catch (err) {
             alert(`标签抓取失败: ${err.message}`);
         } finally {
@@ -273,7 +212,7 @@ const DeleteAnnouncement = () => {
                         页面自动删除公告生成器
                     </h1>
                     <p className="text-gray-400 mt-2 text-sm">
-                        快速生成符合 Wikidot 格式的低分/违规页面删除公告代码。支持单页抓取以及按标签全自动抓取。
+                        快速生成符合 Wikidot 格式的低分/违规页面删除公告代码。直接输入标签一键抓取全部相关页面。
                     </p>
                 </div>
 
@@ -310,24 +249,25 @@ const DeleteAnnouncement = () => {
                     </div>
                 )}
 
+                {/* 修改后的单行标签搜索表单 */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-6 bg-gray-800/50 p-4 rounded-xl border border-white/5">
-                    <form onSubmit={handleSingleAdd} className="flex-1 flex flex-col sm:flex-row gap-3">
+                    <form onSubmit={handleTagFetch} className="flex-1 flex flex-col sm:flex-row gap-3">
                         <div className="relative flex-1">
                             <input
                                 type="text"
-                                placeholder="输入页面 URL 或 英文名..."
-                                value={searchInput}
-                                onChange={(e) => setSearchInput(e.target.value)}
-                                disabled={isFetchingSingle}
+                                placeholder="输入抓取标签 (例如: 待删除, 原创)..."
+                                value={tagInput}
+                                onChange={(e) => setTagInput(e.target.value)}
+                                disabled={isBatchFetching}
                                 className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 pl-10 disabled:opacity-50"
                             />
-                            <i className="fa-solid fa-search absolute left-3.5 top-3 text-gray-500"></i>
+                            <i className="fa-solid fa-tags absolute left-3.5 top-3 text-gray-500"></i>
                         </div>
                         <select 
                             className="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 sm:w-48 outline-none"
                             value={selectedSite}
                             onChange={(e) => setSelectedSite(e.target.value)}
-                            disabled={isFetchingSingle}
+                            disabled={isBatchFetching}
                         >
                             {wikis.map(wiki => (
                                 <option key={wiki.PARAM} value={wiki.PARAM}>{wiki.NAME}</option>
@@ -335,19 +275,12 @@ const DeleteAnnouncement = () => {
                         </select>
                         <button 
                             type="submit"
-                            disabled={isFetchingSingle || !searchInput.trim()}
-                            className="px-4 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors shrink-0"
+                            disabled={isBatchFetching || !tagInput.trim()}
+                            className="px-6 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors shrink-0"
                         >
-                            {isFetchingSingle ? '抓取中...' : '添加'}
+                            {isBatchFetching ? '抓取中...' : '按标签抓取'}
                         </button>
                     </form>
-                    
-                    <button 
-                        onClick={() => setShowBatchModal(true)}
-                        className="px-4 py-2.5 bg-gray-700 text-gray-200 font-medium rounded-lg hover:bg-gray-600 transition-colors shrink-0 flex items-center justify-center gap-2"
-                    >
-                        <i className="fa-solid fa-tags"></i> 按标签批量抓取
-                    </button>
                 </div>
 
                 <div className="bg-gray-800/30 rounded-xl border border-white/5 overflow-hidden mb-8">
@@ -399,7 +332,7 @@ const DeleteAnnouncement = () => {
                                         <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
                                             <div className="flex flex-col items-center">
                                                 <i className="fa-solid fa-inbox text-4xl mb-3 opacity-50"></i>
-                                                列表为空，请在上方搜索添加页面
+                                                列表为空，请在上方输入标签提取页面
                                             </div>
                                         </td>
                                     </tr>
@@ -438,65 +371,6 @@ const DeleteAnnouncement = () => {
                     )}
                 </div>
             </div>
-
-            {/* 纯净版：按标签抓取模态框 */}
-            {showBatchModal && (
-                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-                    <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
-                        <div className="px-6 py-4 border-b border-gray-700 flex justify-between items-center bg-gray-900/50">
-                            <h3 className="text-lg font-bold text-white">按标签自动抓取</h3>
-                            {!isBatchFetching && (
-                                <button onClick={() => setShowBatchModal(false)} className="text-gray-400 hover:text-white">
-                                    <i className="fa-solid fa-xmark text-xl"></i>
-                                </button>
-                            )}
-                        </div>
-                        
-                        <div className="p-6">
-                            <p className="text-sm text-gray-400 mb-4">
-                                直接调用 Wikit GraphQL 接口，瞬间提取当前选中站点（<strong className="text-white">{wikis.find(w => w.PARAM === selectedSite)?.NAME}</strong>）下带有特定标签的所有页面。
-                            </p>
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">输入抓取标签</label>
-                                <input
-                                    type="text"
-                                    value={tagInput}
-                                    onChange={(e) => setTagInput(e.target.value)}
-                                    disabled={isBatchFetching}
-                                    className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5"
-                                    placeholder="例如: 待删除, 原创"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            if (!isBatchFetching && tagInput.trim()) handleBatchTags();
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </div>
-                        
-                        <div className="px-6 py-4 bg-gray-900/50 border-t border-gray-700 flex justify-end gap-3">
-                            <button 
-                                onClick={() => setShowBatchModal(false)}
-                                disabled={isBatchFetching}
-                                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors disabled:opacity-50"
-                            >
-                                取消
-                            </button>
-                            <button 
-                                onClick={handleBatchTags}
-                                disabled={isBatchFetching || !tagInput.trim()}
-                                className="px-4 py-2 text-sm bg-indigo-600 text-white font-medium rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors flex items-center"
-                            >
-                                {isBatchFetching ? (
-                                    <><i className="fa-solid fa-circle-notch fa-spin mr-2"></i> 抓取中...</>
-                                ) : '立即全自动抓取'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </>
     );
 };
