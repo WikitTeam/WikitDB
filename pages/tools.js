@@ -32,6 +32,22 @@ const Tools = () => {
                         </p>
                     </Link>
 
+                    {/* 新增：删除公告生成入口 */}
+                    <Link 
+                        href="/tools/delete-announcement" 
+                        className="bg-gray-800/50 rounded-xl p-6 border border-white/10 hover:border-red-500/50 hover:bg-gray-800 transition-all group block"
+                    >
+                        <div className="w-12 h-12 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center text-2xl mb-4 group-hover:scale-110 group-hover:bg-red-500/20 transition-all">
+                            <i className="fa-solid fa-bullhorn"></i>
+                        </div>
+                        <h2 className="text-xl font-bold text-white mb-2 group-hover:text-red-300 transition-colors">
+                            删除公告生成
+                        </h2>
+                        <p className="text-sm text-gray-400 leading-relaxed">
+                            快速抓取页面信息，一键生成符合 Wikidot 格式的低分/违规页面删除公告代码。
+                        </p>
+                    </Link>
+
                     <div className="bg-gray-800/30 rounded-xl p-6 border border-white/5 border-dashed flex flex-col items-center justify-center text-center min-h-[200px] opacity-70">
                         <i className="fa-solid fa-plus text-3xl text-gray-600 mb-3"></i>
                         <h2 className="text-lg font-medium text-gray-500">更多工具</h2>
