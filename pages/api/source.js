@@ -94,8 +94,7 @@ export default async function handler(req, res) {
                     if (data.status === 'ok') {
                         const $src = cheerio.load(data.body);
                         let rawHtml = $src('.page-source').html() || data.body || '';
-                        rawHtml = rawHtml.replace(/<br\s*\/?>/gi, '\n');
-                        sourceCode = rawHtml.replace(/^(?:[ \t\u00a0\u3000]|&nbsp;)+/gm, '').trim();
+                        sourceCode = rawHtml.trim();
                     } else {
                         sourceCode = `请求源码失败，原站返回: ${data.status}`;
                     }
