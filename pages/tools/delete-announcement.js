@@ -249,7 +249,6 @@ const DeleteAnnouncement = () => {
                     </div>
                 )}
 
-                {/* 修改后的单行标签搜索表单 */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-6 bg-gray-800/50 p-4 rounded-xl border border-white/5">
                     <form onSubmit={handleTagFetch} className="flex-1 flex flex-col sm:flex-row gap-3">
                         <div className="relative flex-1">
@@ -259,9 +258,8 @@ const DeleteAnnouncement = () => {
                                 value={tagInput}
                                 onChange={(e) => setTagInput(e.target.value)}
                                 disabled={isBatchFetching}
-                                className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 pl-10 disabled:opacity-50"
+                                className="w-full bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block p-2.5 px-4 disabled:opacity-50"
                             />
-                            <i className="fa-solid fa-tags absolute left-3.5 top-3 text-gray-500"></i>
                         </div>
                         <select 
                             className="bg-gray-900 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 p-2.5 sm:w-48 outline-none"
