@@ -422,4 +422,4 @@ const DeleteAnnouncement = () => {
     );
 };
 
-export default DeleteAnnouncement;uncement;
+export default DeleteAnnouncement;
