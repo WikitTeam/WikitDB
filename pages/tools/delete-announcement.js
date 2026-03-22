@@ -12,13 +12,11 @@ const DeleteAnnouncement = () => {
     const [isBatchFetching, setIsBatchFetching] = useState(false);
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
     
-    // 自动检查 deleted: 分类的状态
     const [deletedPages, setDeletedPages] = useState([]);
     const [isCheckingDeleted, setIsCheckingDeleted] = useState(false);
 
     const [generatedCode, setGeneratedCode] = useState('');
 
-    // 格式化时间的辅助函数，拦截 1970 年
     const formatValidDate = (dateStr) => {
         if (!dateStr) return '未知时间';
         const d = new Date(dateStr);
@@ -28,7 +26,6 @@ const DeleteAnnouncement = () => {
         return d.toLocaleString('zh-CN', { hour12: false });
     };
 
-    // 监听站点切换，自动查询 deleted: 分类
     useEffect(() => {
         if (!selectedSite) return;
         let isMounted = true;
@@ -74,7 +71,7 @@ const DeleteAnnouncement = () => {
                                 creatorName: node.author || '未知',
                                 rating: node.rating || 0,
                                 lastUpdated: formatValidDate(node.created_at),
-                                sourceCode: '' // 自删页面不需要源码
+                                sourceCode: '' 
                             };
                         });
                         setDeletedPages(formatted);
@@ -92,21 +89,14 @@ const DeleteAnnouncement = () => {
         return () => { isMounted = false; };
     }, [selectedSite, wikis]);
 
-    const fetchPageData = async (siteParam, pageName) => {
-        const res = await fetch(`/api/page?site=${siteParam}&page=${encodeURIComponent(pageName)}`);
+    // 修改：改为调用专用的极简源码抓取 API
+    const fetchSourceCode = async (siteParam, pageName) => {
+        const res = await fetch(`/api/source?site=${siteParam}&page=${encodeURIComponent(pageName)}`);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || '抓取失败');
-        
-        if (data.lastUpdated) {
-            const d = new Date(data.lastUpdated.replace(/\//g, '-'));
-            if (!isNaN(d.getTime()) && d.getFullYear() <= 1970) {
-                data.lastUpdated = '未知时间';
-            }
-        }
-        return data;
+        if (!res.ok) throw new Error(data.error || '源码抓取失败');
+        return data.sourceCode;
     };
 
-    // 按标签自动抓取页面（包含源码抓取进度）
     const handleTagFetch = async (e) => {
         if (e) e.preventDefault();
         if (!tagInput.trim() || !selectedSite) return;
@@ -162,9 +152,10 @@ const DeleteAnnouncement = () => {
                     };
                     
                     try {
-                        const pageData = await fetchPageData(selectedSite, node.page);
-                        if (pageData.sourceCode) {
-                            fullData.sourceCode = pageData.sourceCode;
+                        // 修改：仅抓取源码并赋值
+                        const sourceCode = await fetchSourceCode(selectedSite, node.page);
+                        if (sourceCode) {
+                            fullData.sourceCode = sourceCode;
                         }
                     } catch (err) {
                         console.error(`无法抓取 ${node.page} 的源码:`, err);
@@ -189,7 +180,6 @@ const DeleteAnnouncement = () => {
         setPagesList(prev => prev.filter((_, index) => index !== indexToRemove));
     };
 
-    // 生成符合新格式的代码
     const generateCode = () => {
         if (pagesList.length === 0) {
             setGeneratedCode('请先添加至少一个页面。');
@@ -200,7 +190,6 @@ const DeleteAnnouncement = () => {
         const lowScorePages = [];
 
         pagesList.forEach(p => {
-            // 如果页面带 deleted: 前缀，归类为原作者自删
             if (p.title.startsWith('deleted:') || p.originalUrl.includes('/deleted:')) {
                 selfDeletedPages.push(p);
             } else {
@@ -262,7 +251,6 @@ const DeleteAnnouncement = () => {
                     </p>
                 </div>
 
-                {/* 自动检查 deleted: 分类的警告框 */}
                 {deletedPages.length > 0 && (
                     <div className="mb-6 bg-red-900/20 border border-red-500/50 rounded-xl p-5">
                         <div className="flex items-start gap-3">
@@ -295,7 +283,6 @@ const DeleteAnnouncement = () => {
                     </div>
                 )}
 
-                {/* 标签抓取表单 */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-6 bg-gray-800/50 p-4 rounded-xl border border-white/5">
                     <form onSubmit={handleTagFetch} className="flex-1 flex flex-col sm:flex-row gap-3">
                         <div className="relative flex-1">
