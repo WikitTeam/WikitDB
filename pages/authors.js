@@ -356,8 +356,8 @@ const AuthorProfile = () => {
                                                             {author.name}
                                                         </Link>
                                                     </td>
-                                                    <td className="p-4 text-right font-semibold text-green-400">
-                                                        +{author.value}
+                                                    <td className={`p-4 text-right font-semibold ${author.value > 0 ? 'text-green-400' : author.value < 0 ? 'text-red-400' : 'text-gray-400'}`}>
+                                                        {author.value > 0 ? `+${author.value}` : author.value}
                                                     </td>
                                                 </tr>
                                             ))
