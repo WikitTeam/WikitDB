@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 const config = require('../../wikitdb.config.js');
@@ -11,15 +11,82 @@ const DeleteAnnouncement = () => {
     const [pagesList, setPagesList] = useState([]);
     const [isFetchingSingle, setIsFetchingSingle] = useState(false);
     
+    // 自动检查 deleted: 分类的状态
+    const [deletedPages, setDeletedPages] = useState([]);
+    const [isCheckingDeleted, setIsCheckingDeleted] = useState(false);
+
     // 批量抓取状态
     const [showBatchModal, setShowBatchModal] = useState(false);
-    const [batchTab, setBatchTab] = useState('urls'); // 'urls' 或 'tags'
+    const [batchTab, setBatchTab] = useState('urls'); 
     const [batchInput, setBatchInput] = useState('');
     const [tagInput, setTagInput] = useState('待删除');
     const [isBatchFetching, setIsBatchFetching] = useState(false);
     const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
 
     const [generatedCode, setGeneratedCode] = useState('');
+
+    // 监听站点切换，自动查询 deleted: 分类
+    useEffect(() => {
+        if (!selectedSite) return;
+        let isMounted = true;
+        
+        const checkDeletedCategory = async () => {
+            setIsCheckingDeleted(true);
+            setDeletedPages([]);
+            try {
+                const wikiConfig = wikis.find(w => w.PARAM === selectedSite);
+                if (!wikiConfig) return;
+                
+                let actualWikiName = '';
+                try {
+                    actualWikiName = new URL(wikiConfig.URL).hostname.replace(/^www\./i, '').split('.')[0];
+                } catch (e) {
+                    actualWikiName = wikiConfig.URL.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('.')[0];
+                }
+
+                const res = await fetch('https://wikit.unitreaty.org/apiv1/graphql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: `query { articles(wiki: "${actualWikiName}", category: "deleted", pageSize: 50) { nodes { title page rating author created_at } } }`
+                    }),
+                    cache: 'no-store'
+                });
+                
+                const json = await res.json();
+                if (!isMounted) return;
+                
+                if (!json.errors && json.data && json.data.articles && json.data.articles.nodes) {
+                    const nodes = json.data.articles.nodes;
+                    if (nodes.length > 0) {
+                        const formatted = nodes.map(node => {
+                            const pageName = node.page.includes(':') ? node.page : `deleted:${node.page}`;
+                            const titleStr = node.title || pageName;
+                            const displayTitle = titleStr.startsWith('deleted:') ? titleStr : `deleted:${titleStr}`;
+                            
+                            return {
+                                title: displayTitle,
+                                originalUrl: `${wikiConfig.URL.replace(/\/$/, '')}/${pageName}`,
+                                siteName: wikiConfig.NAME,
+                                creatorName: node.author || '未知',
+                                rating: node.rating || 0,
+                                lastUpdated: node.created_at ? new Date(node.created_at).toLocaleString('zh-CN', { hour12: false }) : '未知时间'
+                            };
+                        });
+                        setDeletedPages(formatted);
+                    }
+                }
+            } catch (e) {
+                console.error("检查 deleted 分类失败", e);
+            } finally {
+                if (isMounted) setIsCheckingDeleted(false);
+            }
+        };
+        
+        checkDeletedCategory();
+        
+        return () => { isMounted = false; };
+    }, [selectedSite, wikis]);
 
     // 解析输入的 URL 或页面名
     const parseInputStr = (inputStr) => {
@@ -222,6 +289,39 @@ const DeleteAnnouncement = () => {
                         快速生成符合 Wikidot 格式的低分/违规页面删除公告代码。支持单页抓取、URL批量导入以及按标签全自动抓取。
                     </p>
                 </div>
+
+                {/* 自动检查 deleted: 分类的警告框 */}
+                {deletedPages.length > 0 && (
+                    <div className="mb-6 bg-red-900/20 border border-red-500/50 rounded-xl p-5">
+                        <div className="flex items-start gap-3">
+                            <i className="fa-solid fa-triangle-exclamation text-red-500 text-xl mt-0.5"></i>
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-red-400 mb-1">注意：当前选择的站点存在位于 deleted: 分类下的页面！</h3>
+                                <p className="text-sm text-gray-300 mb-3">这些页面可能已被移动至待删除区，但没有挂上相应标签。你可以快速将它们加入待处理列表：</p>
+                                <div className="bg-gray-900/50 rounded border border-red-900/30 p-3 mb-4 max-h-40 overflow-y-auto space-y-2">
+                                    {deletedPages.map((dp, idx) => (
+                                        <div key={idx} className="text-sm">
+                                            <span className="text-red-400 font-medium">{dp.title}</span>
+                                            <span className="text-gray-500 ml-2">
+                                                (原作者: {dp.creatorName} | 当前评分: <span className={dp.rating < 0 ? 'text-red-400' : 'text-green-400'}>{dp.rating > 0 ? `+${dp.rating}` : dp.rating}</span> | 最后更新: {dp.lastUpdated})
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button 
+                                    onClick={() => {
+                                        const newPages = deletedPages.filter(dp => !pagesList.find(p => p.originalUrl === dp.originalUrl));
+                                        setPagesList(prev => [...prev, ...newPages]);
+                                        setDeletedPages([]);
+                                    }}
+                                    className="px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/50 rounded hover:bg-red-500/30 transition-colors text-sm font-medium flex items-center gap-2"
+                                >
+                                    <i className="fa-solid fa-plus"></i> 一键将以上所有分类页面加入下方处理列表
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex flex-col sm:flex-row gap-4 mb-6 bg-gray-800/50 p-4 rounded-xl border border-white/5">
                     <form onSubmit={handleSingleAdd} className="flex-1 flex flex-col sm:flex-row gap-3">
