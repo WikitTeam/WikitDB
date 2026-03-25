@@ -41,7 +41,22 @@ const PageDetail = () => {
     const [maxHpage, setMaxHpage] = useState(1);
     const [historyLoading, setHistoryLoading] = useState(false);
 
+    const [linePattern, setLinePattern] = useState(null);
+
     const tabs = ['源码', '信息', '历史', '评分'];
+
+    useEffect(() => {
+        const img = new Image();
+        img.src = '/textures/wood-grain.png';
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            setLinePattern(ctx.createPattern(img, 'repeat'));
+        };
+        img.onerror = () => {
+            setLinePattern(null);
+        };
+    }, []);
 
     const fetchPageData = async (signal) => {
         if (!site || !page) return;
@@ -143,7 +158,7 @@ const PageDetail = () => {
                 fill: 'origin',
                 label: '页面评分',
                 data: chartData.map(d => d.score),
-                borderColor: themeColor,
+                borderColor: linePattern || themeColor,
                 backgroundColor: (context) => {
                     const chart = context.chart;
                     const { ctx, chartArea, scales } = chart;
@@ -168,11 +183,11 @@ const PageDetail = () => {
                     }
                     return gradient;
                 },
-                borderWidth: 3,
-                tension: 0,
+                borderWidth: 4,
+                tension: 0.15,
                 stepped: false,
                 segment: {
-                    borderColor: ctx => ctx.p0DataIndex === 0 ? grayColor : themeColor,
+                    borderColor: ctx => ctx.p0DataIndex === 0 ? grayColor : (linePattern || themeColor),
                     borderDash: ctx => ctx.p0DataIndex === 0 ? [6, 6] : undefined,
                 },
                 pointBackgroundColor: (ctx) => ctx.dataIndex === 0 ? grayColor : themeColor,
