@@ -28,16 +28,16 @@ ChartJS.register(
   Legend
 );
 
-// 修改后的插件：不再Centered发光，而是向下 dropped 深沉、扩散的股票阴影
+// 向下扩散的股票阴影（非发光）
 const stockChartShadowPlugin = {
     id: 'stockChartShadow',
     beforeDatasetsDraw: (chart) => {
         const ctx = chart.ctx;
         ctx.save();
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.15)'; // 柔和深沉白光
-        ctx.shadowBlur = 12; // 扩散
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.15)'; 
+        ctx.shadowBlur = 12; 
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 10; // 关键：向下跌落，营造深度
+        ctx.shadowOffsetY = 10; // 向下坠落的深度阴影
     },
     afterDatasetsDraw: (chart) => {
         chart.ctx.restore();
@@ -148,8 +148,10 @@ const PageDetail = () => {
     }
 
     // 国际标准红绿
-    const colorRise = 'rgba(34, 197, 94, 1)'; // 国际绿涨
-    const colorDrop = 'rgba(239, 68, 68, 1)'; // 国际红跌
+    const colorRise = 'rgba(34, 197, 94, 1)'; 
+    const colorDrop = 'rgba(239, 68, 68, 1)'; 
+    const bgRise = 'rgba(34, 197, 94, 0.2)';
+    const bgDrop = 'rgba(239, 68, 68, 0.2)';
 
     const lineChartData = {
         labels: chartData.map(d => d.date),
@@ -158,19 +160,18 @@ const PageDetail = () => {
                 label: '页面评分',
                 data: chartData.map(d => d.score),
                 fill: 'origin',
-                borderWidth: 3,
-                tension: 0.4, // 缝合：平滑曲线
+                borderWidth: 2.5, // 稍微调细一点点，显得更干脆
+                tension: 0, // 关键修复：绝对直线，消除平滑曲线带来的颜色拼接感
+                borderJoinStyle: 'round', // 拐点处使用圆润过渡，避免尖刺
                 stepped: false,
                 segment: {
-                    // 修复：分段变色逻辑。ctx => ctx.p1.y < ctx.p0.y 为跌
                     borderColor: ctx => {
                         if (!ctx.p0 || !ctx.p1) return colorRise;
                         return ctx.p1.parsed.y < ctx.p0.parsed.y ? colorDrop : colorRise;
                     },
-                    // 背景也独立分段变色：红线底下是透红，绿线底下是透绿
                     backgroundColor: ctx => {
-                        if (!ctx.p0 || !ctx.p1) return 'rgba(34, 197, 94, 0.2)';
-                        return ctx.p1.parsed.y < ctx.p0.parsed.y ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)';
+                        if (!ctx.p0 || !ctx.p1) return bgRise;
+                        return ctx.p1.parsed.y < ctx.p0.parsed.y ? bgDrop : bgRise;
                     }
                 },
                 pointBackgroundColor: (ctx) => {
