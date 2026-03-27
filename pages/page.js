@@ -28,7 +28,6 @@ ChartJS.register(
   Legend
 );
 
-// 让线发光的插件
 const neonGlowPlugin = {
     id: 'neonGlow',
     beforeDatasetsDraw: (chart) => {
@@ -148,7 +147,7 @@ const PageDetail = () => {
     }
 
     const isNegative = chartData.length > 0 && chartData[chartData.length - 1].score < 0;
-    const neonColor = isNegative ? 'rgba(244, 63, 94, 1)' : 'rgba(56, 189, 248, 1)';
+    const neonColor = isNegative ? 'rgba(239, 68, 68, 1)' : 'rgba(34, 197, 94, 1)';
 
     const lineChartData = {
         labels: chartData.map(d => d.date),
@@ -170,18 +169,18 @@ const PageDetail = () => {
                     const zeroRatio = Math.max(0, Math.min(1, (zeroY - topY) / (bottomY - topY)));
                     
                     if (isNegative) {
-                        gradient.addColorStop(0, 'rgba(244, 63, 94, 0)');
-                        gradient.addColorStop(zeroRatio, 'rgba(244, 63, 94, 0)');
-                        gradient.addColorStop(1, 'rgba(244, 63, 94, 0.4)');
+                        gradient.addColorStop(0, 'rgba(239, 68, 68, 0)');
+                        gradient.addColorStop(zeroRatio, 'rgba(239, 68, 68, 0)');
+                        gradient.addColorStop(1, 'rgba(239, 68, 68, 0.4)');
                     } else {
-                        gradient.addColorStop(0, 'rgba(56, 189, 248, 0.4)');
-                        gradient.addColorStop(zeroRatio, 'rgba(56, 189, 248, 0)');
-                        gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
+                        gradient.addColorStop(0, 'rgba(34, 197, 94, 0.4)');
+                        gradient.addColorStop(zeroRatio, 'rgba(34, 197, 94, 0)');
+                        gradient.addColorStop(1, 'rgba(34, 197, 94, 0)');
                     }
                     return gradient;
                 },
                 borderWidth: 3,
-                tension: 0.4, 
+                tension: 0, 
                 pointBackgroundColor: neonColor,
                 pointBorderColor: '#ffffff',
                 pointBorderWidth: 2,
@@ -205,7 +204,7 @@ const PageDetail = () => {
                     precision: 0, 
                     stepSize: 10, 
                     color: '#9CA3AF',
-                    font: { size: 12 }
+                    font: { size: 12, family: 'monospace' }
                 },
                 grid: {
                     color: (context) => context.tick.value === 0 ? 'rgba(107, 114, 128, 0.5)' : 'rgba(55, 65, 81, 0.3)',
@@ -217,7 +216,7 @@ const PageDetail = () => {
                 ticks: {
                     color: '#9CA3AF',
                     maxTicksLimit: 8,
-                    font: { size: 10 }
+                    font: { size: 10, family: 'monospace' }
                 },
                 grid: {
                     display: false
@@ -230,6 +229,7 @@ const PageDetail = () => {
                 backgroundColor: 'rgba(17, 24, 39, 0.9)',
                 titleColor: '#9CA3AF',
                 bodyColor: '#FFFFFF',
+                bodyFont: { family: 'monospace', size: 14, weight: 'bold' },
                 borderColor: neonColor,
                 borderWidth: 1,
                 padding: 12,
