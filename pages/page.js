@@ -55,6 +55,10 @@ const PageDetail = () => {
     const [maxHpage, setMaxHpage] = useState(1);
     const [historyLoading, setHistoryLoading] = useState(false);
 
+    // 交易弹窗状态管理
+    const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+    const [tradeDirection, setTradeDirection] = useState('long'); // 'long' = 做多, 'short' = 做空
+
     const tabs = ['源码', '信息', '历史', '评分'];
 
     const fetchPageData = async (signal) => {
@@ -269,6 +273,92 @@ const PageDetail = () => {
             <Head>
                 <title>{`${data.title} - ${config.SITE_NAME}`}</title>
             </Head>
+
+            {/* 开仓交易弹窗面板 */}
+            {isTradeModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl m-4">
+                        <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                            开仓 <span className="text-gray-500 font-normal ml-2 text-base">全站</span>
+                        </h2>
+                        
+                        {/* 做多 / 做空 选择器 */}
+                        <div className="flex gap-4 mb-6">
+                            <button
+                                onClick={() => setTradeDirection('long')}
+                                className={`flex-1 py-2.5 rounded-lg border-2 font-bold transition-colors ${
+                                    tradeDirection === 'long' 
+                                        ? 'border-green-600 text-green-700 bg-green-50' 
+                                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                }`}
+                            >
+                                做多
+                            </button>
+                            <button
+                                onClick={() => setTradeDirection('short')}
+                                className={`flex-1 py-2.5 rounded-lg border-2 font-bold transition-colors ${
+                                    tradeDirection === 'short' 
+                                        ? 'border-red-500 text-red-600 bg-red-50' 
+                                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                                }`}
+                            >
+                                做空
+                            </button>
+                        </div>
+
+                        {/* 参数设置 */}
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                            <div>
+                                <label className="block text-sm text-gray-500 mb-1.5">锁仓</label>
+                                <select className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none text-sm">
+                                    <option>T1 (24h)</option>
+                                    <option>T3 (72h)</option>
+                                    <option>T7 (168h)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-500 mb-1.5">保证金</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
+                                    placeholder="输入金额"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm text-gray-500 mb-1.5">杠杆</label>
+                                <select className="w-full border border-gray-300 rounded-lg p-2.5 text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none text-sm">
+                                    <option>2x</option>
+                                    <option>5x</option>
+                                    <option>10x</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="text-sm text-gray-500 mb-8 mt-4">
+                            约 12 手 · fee ≈ 1T
+                        </div>
+
+                        {/* 底部按钮 */}
+                        <div className="flex justify-end gap-3 mt-4">
+                            <button 
+                                onClick={() => setIsTradeModalOpen(false)} 
+                                className="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium transition-colors"
+                            >
+                                取消
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    alert('下单请求已发送！'); // 这里可以后续替换成真实的交易 API
+                                    setIsTradeModalOpen(false);
+                                }} 
+                                className="px-5 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium transition-colors shadow-lg shadow-blue-600/30"
+                            >
+                                确认开仓
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="py-4">
                 <div className="mb-4 text-sm text-gray-400">
@@ -531,9 +621,17 @@ const PageDetail = () => {
                         <div className="space-y-6">
                             {chartData.length > 1 ? (
                                 <div className="w-full bg-black p-6 rounded-lg border border-gray-700 shadow-inner">
-                                    <h3 className="text-lg font-bold text-gray-200 mb-6 flex items-center gap-2 font-sans tracking-widest">
-                                        页面大盘走势 <span className="text-xs text-gray-500 font-normal">（发行价 100.00）</span>
-                                    </h3>
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="text-lg font-bold text-gray-200 flex items-center gap-2 font-sans tracking-widest">
+                                            页面大盘走势 <span className="text-xs text-gray-500 font-normal">（发行价 100.00）</span>
+                                        </h3>
+                                        <button 
+                                            onClick={() => setIsTradeModalOpen(true)}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-1.5 rounded-full text-sm font-bold tracking-widest transition-colors shadow-md shadow-blue-600/20"
+                                        >
+                                            开仓
+                                        </button>
+                                    </div>
                                     <div className="w-full h-[320px] relative">
                                         <Line data={lineChartData} options={lineChartOptions} plugins={[stockCrosshairPlugin]} />
                                     </div>
