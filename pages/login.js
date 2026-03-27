@@ -36,14 +36,17 @@ export default function Login() {
             
             const data = await res.json();
             
-            if (res.ok) {
-                setMessage('登录成功，跳转中...');
-                setTimeout(() => {
-                    router.push('/');
-                }, 1000);
-            } else {
-                setMessage(data.error || '账号或密码错误');
-            }
+if (res.ok) {
+    setMessage('登录成功，跳转中...');
+    // 把后端返回的信息存到本地，这样 Header 才能识别到
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('username', data.username);
+    setTimeout(() => {
+        router.push('/');
+    }, 1000);
+} else {
+    setMessage(data.error || '账号或密码错误');
+}
         } catch (err) {
             setMessage('网络请求失败');
         } finally {
