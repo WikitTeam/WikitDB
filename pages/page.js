@@ -28,16 +28,15 @@ ChartJS.register(
   Legend
 );
 
-// 向下扩散的股票阴影（非发光）
-const stockChartShadowPlugin = {
-    id: 'stockChartShadow',
+// 炒股软件专属的十字线阴影插件
+const stockCrosshairPlugin = {
+    id: 'stockCrosshair',
     beforeDatasetsDraw: (chart) => {
         const ctx = chart.ctx;
         ctx.save();
-        ctx.shadowColor = 'rgba(255, 255, 255, 0.15)'; 
-        ctx.shadowBlur = 12; 
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 10; // 向下坠落的深度阴影
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'; 
+        ctx.shadowBlur = 8; 
+        ctx.shadowOffsetY = 4; 
     },
     afterDatasetsDraw: (chart) => {
         chart.ctx.restore();
@@ -51,7 +50,7 @@ const PageDetail = () => {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [activeTab, setActiveTab] = useState('源码');
+    const [activeTab, setActiveTab] = useState('评分');
 
     const [hpage, setHpage] = useState(1);
     const [maxHpage, setMaxHpage] = useState(1);
@@ -119,13 +118,13 @@ const PageDetail = () => {
     }, [router.isReady, site, page]);
 
     if (loading) {
-        return <div className="py-12 text-center text-gray-400">加载详情数据中...</div>;
+        return <div className="py-12 text-center text-gray-400">正在接入大盘数据...</div>;
     }
 
     if (error) {
         return (
             <div className="py-12 text-center">
-                <div className="text-red-400 mb-4">加载失败: {error}</div>
+                <div className="text-red-400 mb-4">数据接入失败: {error}</div>
                 <button onClick={() => router.back()} className="text-indigo-400 hover:text-indigo-300">返回上一页</button>
             </div>
         );
@@ -135,34 +134,38 @@ const PageDetail = () => {
 
     let chartData = [];
     if (data.scoreHistory && data.scoreHistory.length > 0) {
+        // 核心逻辑：把所有评分映射到 100 元的发行价上
         chartData = data.scoreHistory.map((item) => ({
-            score: item.score,
+            originalScore: item.score,
+            stockPrice: 100 + item.score,
             date: item.date
         }));
         
         if (chartData[0].date === '初始记录') {
-            chartData[0].score = 0;
+            chartData[0].originalScore = 0;
+            chartData[0].stockPrice = 100;
+            chartData[0].date = '首发上市';
         } else {
-            chartData.unshift({ score: 0, date: '初始记录' });
+            chartData.unshift({ originalScore: 0, stockPrice: 100, date: '首发上市' });
         }
     }
 
-    // 国际标准红绿
-    const colorRise = 'rgba(34, 197, 94, 1)'; 
-    const colorDrop = 'rgba(239, 68, 68, 1)'; 
-    const bgRise = 'rgba(34, 197, 94, 0.2)';
-    const bgDrop = 'rgba(239, 68, 68, 0.2)';
+    // A 股标准：红涨绿跌
+    const colorRise = 'rgba(239, 68, 68, 1)'; 
+    const colorDrop = 'rgba(34, 197, 94, 1)'; 
+    const bgRise = 'rgba(239, 68, 68, 0.2)';
+    const bgDrop = 'rgba(34, 197, 94, 0.2)';
 
     const lineChartData = {
         labels: chartData.map(d => d.date),
         datasets: [
             {
-                label: '页面评分',
-                data: chartData.map(d => d.score),
+                label: '页面大盘',
+                data: chartData.map(d => d.stockPrice),
                 fill: 'origin',
-                borderWidth: 2.5, // 稍微调细一点点，显得更干脆
-                tension: 0, // 关键修复：绝对直线，消除平滑曲线带来的颜色拼接感
-                borderJoinStyle: 'round', // 拐点处使用圆润过渡，避免尖刺
+                borderWidth: 2,
+                tension: 0, 
+                borderJoinStyle: 'miter', 
                 stepped: false,
                 segment: {
                     borderColor: ctx => {
@@ -176,14 +179,14 @@ const PageDetail = () => {
                 },
                 pointBackgroundColor: (ctx) => {
                     if (ctx.dataIndex === 0) return colorRise;
-                    const prev = chartData[ctx.dataIndex - 1].score;
-                    const curr = chartData[ctx.dataIndex].score;
+                    const prev = chartData[ctx.dataIndex - 1].stockPrice;
+                    const curr = chartData[ctx.dataIndex].stockPrice;
                     return curr < prev ? colorDrop : colorRise;
                 },
-                pointBorderColor: '#ffffff',
-                pointBorderWidth: 2,
+                pointBorderColor: '#000000',
+                pointBorderWidth: 1,
                 pointRadius: 0, 
-                pointHoverRadius: 6,
+                pointHoverRadius: 5,
             }
         ]
     };
@@ -196,17 +199,23 @@ const PageDetail = () => {
         },
         scales: {
             y: {
-                suggestedMin: 0,
-                suggestedMax: 0,
+                suggestedMin: 80, // 股市需要一定的上下浮动空间
+                suggestedMax: 120,
                 ticks: {
                     precision: 0, 
-                    stepSize: 10, 
-                    color: '#9CA3AF',
-                    font: { size: 12, family: 'monospace' }
+                    stepSize: 5, 
+                    color: (context) => {
+                        if (context.tick.value > 100) return colorRise;
+                        if (context.tick.value < 100) return colorDrop;
+                        return '#ffffff';
+                    },
+                    font: { size: 12, family: 'monospace', weight: 'bold' }
                 },
                 grid: {
-                    color: (context) => context.tick.value === 0 ? 'rgba(107, 114, 128, 0.5)' : 'rgba(55, 65, 81, 0.3)',
-                    borderDash: (context) => context.tick.value === 0 ? [] : [4, 4],
+                    // 100 元基准线加粗加亮
+                    color: (context) => context.tick.value === 100 ? 'rgba(255, 255, 255, 0.4)' : 'rgba(55, 65, 81, 0.3)',
+                    lineWidth: (context) => context.tick.value === 100 ? 2 : 1,
+                    borderDash: (context) => context.tick.value === 100 ? [] : [4, 4],
                     drawBorder: false,
                 }
             },
@@ -217,14 +226,15 @@ const PageDetail = () => {
                     font: { size: 10, family: 'monospace' }
                 },
                 grid: {
-                    display: false
+                    color: 'rgba(55, 65, 81, 0.2)',
+                    drawBorder: false,
                 }
             }
         },
         plugins: {
             legend: { display: false },
             tooltip: {
-                backgroundColor: 'rgba(17, 24, 39, 0.9)',
+                backgroundColor: 'rgba(0, 0, 0, 0.9)',
                 titleColor: '#9CA3AF',
                 bodyColor: '#FFFFFF',
                 bodyFont: { family: 'monospace', size: 14, weight: 'bold' },
@@ -232,19 +242,22 @@ const PageDetail = () => {
                     if (!context.tooltip.dataPoints || context.tooltip.dataPoints.length === 0) return colorRise;
                     const dataIndex = context.tooltip.dataPoints[0].dataIndex;
                     if (dataIndex === 0) return colorRise;
-                    const prev = chartData[dataIndex - 1].score;
-                    const curr = chartData[dataIndex].score;
+                    const prev = chartData[dataIndex - 1].stockPrice;
+                    const curr = chartData[dataIndex].stockPrice;
                     return curr < prev ? colorDrop : colorRise;
                 },
-                borderWidth: 1,
+                borderWidth: 2,
                 padding: 12,
                 displayColors: false,
                 intersect: false,
                 mode: 'index',
                 callbacks: {
                     label: function(context) {
-                        let val = context.parsed.y;
-                        return val > 0 ? `+${val}` : `${val}`;
+                        const dataIndex = context.dataIndex;
+                        const stockPrice = chartData[dataIndex].stockPrice;
+                        const originalScore = chartData[dataIndex].originalScore;
+                        const trend = originalScore > 0 ? '+' : '';
+                        return `股价: ${stockPrice.toFixed(2)} (原评分: ${trend}${originalScore})`;
                     }
                 }
             }
@@ -305,7 +318,7 @@ const PageDetail = () => {
                                     <div className="flex items-center gap-2">
                                         <span className="text-gray-500">页面评分:</span>
                                         <div className="flex items-center">
-                                            <span className={`font-medium ${data.rating && data.rating.toString().includes('+') ? 'text-green-400' : data.rating && data.rating.toString().includes('-') ? 'text-red-400' : 'text-gray-300'}`}>
+                                            <span className={`font-medium ${data.rating && data.rating.toString().includes('+') ? 'text-red-500' : data.rating && data.rating.toString().includes('-') ? 'text-green-500' : 'text-gray-300'}`}>
                                                 {data.rating}
                                             </span>
                                             {data.upvotes !== undefined && data.downvotes !== undefined && (
@@ -349,7 +362,7 @@ const PageDetail = () => {
                             onClick={() => fetchPageData()}
                             className="px-3 py-1.5 text-sm font-medium rounded-md bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
                         >
-                            <i className="fa-solid fa-rotate-right mr-1"></i> 刷新页面
+                            <i className="fa-solid fa-rotate-right mr-1"></i> 刷新数据
                         </button>
                         <button 
                             onClick={() => router.back()}
@@ -439,7 +452,7 @@ const PageDetail = () => {
                             <div className="bg-gray-900/50 p-0 rounded-lg overflow-x-auto border border-gray-700 relative">
                                 {historyLoading && (
                                     <div className="absolute inset-0 bg-gray-900/60 flex items-center justify-center z-10">
-                                        <span className="text-gray-300">加载中...</span>
+                                        <span className="text-gray-300">读取中...</span>
                                     </div>
                                 )}
                                 <div 
@@ -521,24 +534,24 @@ const PageDetail = () => {
                     {activeTab === '评分' && (
                         <div className="space-y-6">
                             {chartData.length > 1 ? (
-                                <div className="w-full bg-gray-900/50 p-6 rounded-lg border border-gray-700">
-                                    <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
-                                        <i className="fa-solid fa-chart-line text-indigo-400"></i> 按日评分走势
+                                <div className="w-full bg-black p-6 rounded-lg border border-gray-700 shadow-inner">
+                                    <h3 className="text-lg font-bold text-gray-200 mb-6 flex items-center gap-2 font-sans tracking-widest">
+                                        页面大盘走势 <span className="text-xs text-gray-500 font-normal">（发行价 100.00）</span>
                                     </h3>
                                     <div className="w-full h-[320px] relative">
-                                        <Line data={lineChartData} options={lineChartOptions} plugins={[stockChartShadowPlugin]} />
+                                        <Line data={lineChartData} options={lineChartOptions} plugins={[stockCrosshairPlugin]} />
                                     </div>
                                 </div>
                             ) : (
                                 <div className="text-center py-10 text-gray-400 bg-gray-900/50 rounded-lg border border-gray-700">
-                                    开始记录数据... 明日即可生成走势曲线。
+                                    暂无交易数据，等待大盘开市...
                                 </div>
                             )}
 
                             {data.ratingTable && data.ratingTable.length > 0 ? (
                                 <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-700">
                                     <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
-                                        <i className="fa-solid fa-users text-indigo-400"></i> 当前评分者列表
+                                        大盘持仓列表
                                     </h3>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                                         {data.ratingTable.map((rate, index) => (
@@ -557,7 +570,7 @@ const PageDetail = () => {
                                                         {rate.user}
                                                     </Link>
                                                 </div>
-                                                <span className={`text-sm font-bold px-2 py-0.5 rounded ${rate.vote === '+1' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                                                <span className={`text-sm font-bold px-2 py-0.5 rounded ${rate.vote === '+1' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-green-500/10 text-green-500 border border-green-500/20'}`}>
                                                     {rate.vote === '+1' ? '+1' : '-1'}
                                                 </span>
                                             </div>
@@ -566,7 +579,7 @@ const PageDetail = () => {
                                 </div>
                             ) : (
                                 <div className="text-center py-10 text-gray-500 bg-gray-900/50 rounded-lg border border-gray-700">
-                                    暂无当前评分者数据
+                                    暂无大盘持仓数据
                                 </div>
                             )}
                         </div>
