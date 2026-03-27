@@ -28,6 +28,22 @@ ChartJS.register(
   Legend
 );
 
+// 修改后的插件：不再Centered发光，而是向下 dropped 深沉、扩散的股票阴影
+const stockChartShadowPlugin = {
+    id: 'stockChartShadow',
+    beforeDatasetsDraw: (chart) => {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.15)'; // 柔和深沉白光
+        ctx.shadowBlur = 12; // 扩散
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 10; // 关键：向下跌落，营造深度
+    },
+    afterDatasetsDraw: (chart) => {
+        chart.ctx.restore();
+    }
+};
+
 const PageDetail = () => {
     const router = useRouter();
     const { site, page } = router.query;
@@ -131,10 +147,9 @@ const PageDetail = () => {
         }
     }
 
-    const colorRise = 'rgba(34, 197, 94, 1)'; 
-    const colorDrop = 'rgba(239, 68, 68, 1)'; 
-    const bgRise = 'rgba(34, 197, 94, 0.2)';
-    const bgDrop = 'rgba(239, 68, 68, 0.2)';
+    // 国际标准红绿
+    const colorRise = 'rgba(34, 197, 94, 1)'; // 国际绿涨
+    const colorDrop = 'rgba(239, 68, 68, 1)'; // 国际红跌
 
     const lineChartData = {
         labels: chartData.map(d => d.date),
@@ -144,16 +159,18 @@ const PageDetail = () => {
                 data: chartData.map(d => d.score),
                 fill: 'origin',
                 borderWidth: 3,
-                tension: 0.4, 
+                tension: 0.4, // 缝合：平滑曲线
                 stepped: false,
                 segment: {
+                    // 修复：分段变色逻辑。ctx => ctx.p1.y < ctx.p0.y 为跌
                     borderColor: ctx => {
                         if (!ctx.p0 || !ctx.p1) return colorRise;
                         return ctx.p1.parsed.y < ctx.p0.parsed.y ? colorDrop : colorRise;
                     },
+                    // 背景也独立分段变色：红线底下是透红，绿线底下是透绿
                     backgroundColor: ctx => {
-                        if (!ctx.p0 || !ctx.p1) return bgRise;
-                        return ctx.p1.parsed.y < ctx.p0.parsed.y ? bgDrop : bgRise;
+                        if (!ctx.p0 || !ctx.p1) return 'rgba(34, 197, 94, 0.2)';
+                        return ctx.p1.parsed.y < ctx.p0.parsed.y ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)';
                     }
                 },
                 pointBackgroundColor: (ctx) => {
@@ -508,7 +525,7 @@ const PageDetail = () => {
                                         <i className="fa-solid fa-chart-line text-indigo-400"></i> 按日评分走势
                                     </h3>
                                     <div className="w-full h-[320px] relative">
-                                        <Line data={lineChartData} options={lineChartOptions} />
+                                        <Line data={lineChartData} options={lineChartOptions} plugins={[stockChartShadowPlugin]} />
                                     </div>
                                 </div>
                             ) : (
