@@ -28,6 +28,20 @@ ChartJS.register(
   Legend
 );
 
+const stockCrosshairPlugin = {
+    id: 'stockCrosshair',
+    beforeDatasetsDraw: (chart) => {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'; 
+        ctx.shadowBlur = 8; 
+        ctx.shadowOffsetY = 4; 
+    },
+    afterDatasetsDraw: (chart) => {
+        chart.ctx.restore();
+    }
+};
+
 const PageDetail = () => {
     const router = useRouter();
     const { site, page } = router.query;
@@ -41,9 +55,9 @@ const PageDetail = () => {
     const [maxHpage, setMaxHpage] = useState(1);
     const [historyLoading, setHistoryLoading] = useState(false);
 
-    // 交易弹窗及表单状态
+    // 交易弹窗状态管理
     const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
-    const [tradeDirection, setTradeDirection] = useState('long');
+    const [tradeDirection, setTradeDirection] = useState('long'); // 'long' = 做多, 'short' = 做空
     const [margin, setMargin] = useState('');
     const [lockType, setLockType] = useState('T1 (24h)');
     const [leverage, setLeverage] = useState('2x');
@@ -110,7 +124,6 @@ const PageDetail = () => {
         };
     }, [router.isReady, site, page]);
 
-    // 真正向数据库提交开仓记录的函数
     const handleTradeSubmit = async () => {
         const username = localStorage.getItem('username');
         if (!username) {
@@ -147,7 +160,7 @@ const PageDetail = () => {
             if (res.ok) {
                 alert('开仓成功！交易已记录。');
                 setIsTradeModalOpen(false);
-                setMargin(''); // 清空输入框
+                setMargin(''); 
             } else {
                 alert(result.error || '开仓失败了');
             }
@@ -184,23 +197,28 @@ const PageDetail = () => {
         if (chartData[0].date === '初始记录') {
             chartData[0].originalScore = 0;
             chartData[0].stockPrice = 100;
+            chartData[0].date = '开仓';
         } else {
-            chartData.unshift({ originalScore: 0, stockPrice: 100, date: chartData[0].date });
+            chartData.unshift({ originalScore: 0, stockPrice: 100, date: '开仓' });
         }
     }
 
-    // TradingView 风格的图表配置
+    const colorRise = 'rgba(239, 68, 68, 1)'; 
+    const colorDrop = 'rgba(34, 197, 94, 1)'; 
+    const bgRise = 'rgba(239, 68, 68, 0.2)';
+    const bgDrop = 'rgba(34, 197, 94, 0.2)';
+
     const lineChartData = {
         labels: chartData.map(d => d.date),
         datasets: [
             {
                 label: '页面大盘',
                 data: chartData.map(d => d.stockPrice),
-                borderColor: '#00bcd4', // 青蓝色线条
-                backgroundColor: 'rgba(0, 188, 212, 0.1)', // 底部淡蓝色填充
+                borderColor: '#00bcd4', 
+                backgroundColor: 'rgba(0, 188, 212, 0.1)', 
                 fill: true,
                 borderWidth: 2,
-                tension: 0, // 保持折线感
+                tension: 0, 
                 pointRadius: 0, 
                 pointHoverRadius: 5,
                 pointBackgroundColor: '#00bcd4',
@@ -216,7 +234,7 @@ const PageDetail = () => {
         },
         scales: {
             y: {
-                position: 'right', // Y轴放在右侧
+                position: 'right', 
                 suggestedMin: 80,
                 suggestedMax: 120,
                 ticks: {
@@ -224,7 +242,7 @@ const PageDetail = () => {
                     font: { size: 12, family: 'sans-serif' }
                 },
                 grid: {
-                    color: '#f3f4f6', // 极淡的灰色网格线
+                    color: '#f3f4f6', 
                     drawBorder: false,
                 }
             },
@@ -269,9 +287,8 @@ const PageDetail = () => {
                 <title>{`${data.title} - ${config.SITE_NAME}`}</title>
             </Head>
 
-            {/* 开仓交易面板 */}
             {isTradeModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                     <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl m-4">
                         <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
                             开仓 <span className="text-gray-500 font-normal ml-2 text-base">全站</span>
@@ -408,8 +425,29 @@ const PageDetail = () => {
                                             <span className={`font-medium ${data.rating && data.rating.toString().includes('+') ? 'text-red-500' : data.rating && data.rating.toString().includes('-') ? 'text-green-500' : 'text-gray-300'}`}>
                                                 {data.rating}
                                             </span>
+                                            {data.upvotes !== undefined && data.downvotes !== undefined && (
+                                                <span className="text-gray-400 text-sm ml-1.5 font-medium">
+                                                    (+{data.upvotes}, -{data.downvotes})
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
+
+                                    {data.comments !== undefined && data.comments !== null && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-gray-500">评论数:</span>
+                                            <span className="font-medium text-gray-300">{data.comments}</span>
+                                        </div>
+                                    )}
+
+                                    {data.pageId && (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-gray-500">页面 ID:</span>
+                                            <span className="font-medium text-gray-300">
+                                                {data.pageId}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -437,6 +475,18 @@ const PageDetail = () => {
                             <i className="fa-solid fa-arrow-left mr-1"></i> 返回
                         </button>
                     </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-6">
+                    <button className="px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600/20 text-blue-400 border border-blue-500/30 hover:bg-blue-600/30 transition-colors">
+                        编辑
+                    </button>
+                    <button className="px-3 py-1.5 text-sm font-medium rounded-md bg-orange-600/20 text-orange-400 border border-orange-500/30 hover:bg-orange-600/30 transition-colors">
+                        强制覆盖
+                    </button>
+                    <button className="px-3 py-1.5 text-sm font-medium rounded-md bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/30 transition-colors">
+                        删除
+                    </button>
                 </div>
 
                 <div className="border-b border-gray-700 mb-6">
@@ -467,12 +517,122 @@ const PageDetail = () => {
                         </div>
                     )}
 
-                    {/* ... 信息和历史标签页保持原样 ... */}
                     {activeTab === '信息' && (
-                        <div className="text-gray-300">页面基本信息内容...</div>
+                        <div className="space-y-4 text-gray-300">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                                    <div className="text-gray-500 text-sm mb-1">页面标题</div>
+                                    <div className="font-medium text-white">{data.title}</div>
+                                </div>
+                                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                                    <div className="text-gray-500 text-sm mb-1">来源站点</div>
+                                    <div>{data.siteName}</div>
+                                </div>
+                                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                                    <div className="text-gray-500 text-sm mb-1">创建者 / 搬运者</div>
+                                    <div className="flex items-center">
+                                        {data.creatorAvatar && (
+                                            <img src={data.creatorAvatar} alt="avatar" className="w-5 h-5 rounded-full mr-2 object-cover" />
+                                        )}
+                                        {data.creatorName}
+                                    </div>
+                                </div>
+                                <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                                    <div className="text-gray-500 text-sm mb-1">原站最后更新时间</div>
+                                    <div>{data.lastUpdated}</div>
+                                </div>
+                            </div>
+                            <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+                                <div className="text-gray-500 text-sm mb-1">完整原始链接</div>
+                                <a href={data.originalUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline break-all">
+                                    {data.originalUrl}
+                                </a>
+                            </div>
+                        </div>
                     )}
+
                     {activeTab === '历史' && (
-                        <div className="text-gray-300">页面历史内容...</div>
+                        <div className="space-y-4">
+                            <div className="bg-gray-900/50 p-0 rounded-lg overflow-x-auto border border-gray-700 relative">
+                                {historyLoading && (
+                                    <div className="absolute inset-0 bg-gray-900/60 flex items-center justify-center z-10">
+                                        <span className="text-gray-300">读取中...</span>
+                                    </div>
+                                )}
+                                <div 
+                                    className="w-full text-sm text-gray-300 
+                                    [&_table]:w-full [&_table]:text-left [&_table]:border-collapse [&_table]:min-w-max
+                                    [&_th]:p-4 [&_th]:font-medium [&_th]:text-gray-400 [&_th]:border-b [&_th]:border-gray-700 [&_th]:bg-gray-800/50
+                                    [&_td]:p-4 [&_td]:border-b [&_td]:border-gray-700/50
+                                    [&_tr:last-child_td]:border-b-0
+                                    [&_tr:hover_td]:bg-gray-800/80 [&_tr]:transition-colors
+                                    [&_img]:inline-block [&_img]:w-5 [&_img]:h-5 [&_img]:rounded-full [&_img]:mr-2 [&_img]:align-middle [&_img]:object-cover [&_img]:border [&_img]:border-gray-600
+                                    [&_a]:text-indigo-400 [&_a:hover]:text-indigo-300 [&_a]:transition-colors"
+                                    dangerouslySetInnerHTML={{ __html: data.historyHtml }}
+                                />
+                            </div>
+                            <div className="flex flex-wrap justify-between items-center bg-gray-900/30 p-3 rounded-lg border border-gray-700 gap-4">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <button 
+                                        onClick={() => loadHistoryPage(hpage - 1)}
+                                        disabled={hpage <= 1 || historyLoading}
+                                        className="px-3 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        上一页
+                                    </button>
+                                    
+                                    {Array.from({ length: maxHpage || 1 }, (_, i) => i + 1).map(pageNum => (
+                                        <button
+                                            key={pageNum}
+                                            onClick={() => loadHistoryPage(pageNum)}
+                                            disabled={historyLoading}
+                                            className={`px-3 py-1.5 text-sm rounded transition-colors ${
+                                                hpage === pageNum
+                                                    ? 'bg-indigo-600 text-white cursor-default'
+                                                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                                            }`}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    ))}
+
+                                    <button 
+                                        onClick={() => loadHistoryPage(hpage + 1)}
+                                        disabled={historyLoading || hpage >= (maxHpage || 1)}
+                                        className="px-3 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        下一页
+                                    </button>
+                                </div>
+                                
+                                <div className="flex items-center gap-2">
+                                    <span className="text-gray-400 text-sm">共 {maxHpage || 1} 页，跳至</span>
+                                    <input 
+                                        type="number" 
+                                        min="1" 
+                                        max={maxHpage || 1}
+                                        className="w-16 px-2 py-1 text-sm bg-gray-800 border border-gray-600 rounded text-gray-300 focus:outline-none focus:border-indigo-500"
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                const val = parseInt(e.target.value);
+                                                if (!isNaN(val)) loadHistoryPage(val);
+                                            }
+                                        }}
+                                        id="pageJumpInput"
+                                    />
+                                    <button 
+                                        onClick={() => {
+                                            const val = parseInt(document.getElementById('pageJumpInput').value);
+                                            if (!isNaN(val)) loadHistoryPage(val);
+                                        }}
+                                        disabled={historyLoading}
+                                        className="px-3 py-1.5 text-sm rounded bg-gray-800 text-gray-300 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        跳转
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     {activeTab === '评分' && (
@@ -503,7 +663,6 @@ const PageDetail = () => {
                                 </div>
                             )}
 
-                            {/* 大盘持仓列表也稍微调亮一点以适配浅色主题 */}
                             {data.ratingTable && data.ratingTable.length > 0 && (
                                 <div className="bg-gray-900/50 p-6 rounded-lg border border-gray-700">
                                     <h3 className="text-lg font-medium text-white mb-6 flex items-center gap-2">
