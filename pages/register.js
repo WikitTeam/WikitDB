@@ -8,6 +8,7 @@ export default function Register() {
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     
+    // 控制步骤：1是填名字密码，2是去Wikidot绑定
     const [step, setStep] = useState(1);
     const [verifyUrl, setVerifyUrl] = useState('');
 
@@ -16,11 +17,12 @@ export default function Register() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    // 第一步：点击注册，获取验证链接
     const handleRegisterStart = async (e) => {
         e.preventDefault();
         
         if (!formData.username || !formData.password) {
-            setMessage('名字和密码都要写啊');
+            setMessage('名字和密码都要写全');
             return;
         }
 
@@ -41,11 +43,11 @@ export default function Register() {
             let url = '';
             
             try {
-                // 必须正经解析 JSON，才能完美过滤掉多余的结构和转义符
                 const data = JSON.parse(rawText);
-                url = data.url || data.link || data.data || '';
+                // 精准提取 verification-link 字段
+                url = data['verification-link'] || '';
             } catch (err) {
-                // 兜底逻辑：如果后端返回的不是标准 JSON，再用正则提取
+                // 如果后端真的没返回标准 JSON，再作为备用正则提取
                 const match = rawText.match(/https?:\/\/[^\s"'\\]+/);
                 if (match) url = match[0];
             }
@@ -54,15 +56,17 @@ export default function Register() {
                 setVerifyUrl(url);
                 setStep(2);
             } else {
-                setMessage('验证接口没给有效的链接');
+                setMessage('没能在返回数据里找到 verification-link');
+                console.log("接口实际返回的内容:", rawText); // 方便在控制台排查
             }
         } catch (err) {
-            setMessage('网络不太行，获取不到验证链接');
+            setMessage('网络请求失败，请检查控制台');
         } finally {
             setLoading(false);
         }
     };
 
+    // 第二步：绑完之后，提交数据库
     const handleFinalSubmit = async () => {
         setLoading(true);
         setMessage('');
@@ -82,7 +86,7 @@ export default function Register() {
                 }, 1000);
             } else {
                 const data = await res.json();
-                setMessage(data.error || '数据库不给存，换个名字试试？');
+                setMessage(data.error || '存入数据库时失败了');
             }
         } catch (err) {
             setMessage('提交失败，后端可能挂了');
@@ -136,7 +140,7 @@ export default function Register() {
                                 disabled={loading} 
                                 className="w-full text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-lg text-sm px-5 py-2.5 mt-6 transition-all disabled:opacity-50"
                             >
-                                {loading ? '正在通信...' : '注册并验证 Wikidot'}
+                                {loading ? '正在获取...' : '注册并验证 Wikidot'}
                             </button>
                         </>
                     )}
@@ -144,7 +148,7 @@ export default function Register() {
                     {step === 2 && (
                         <div className="p-4 bg-gray-900/50 border border-gray-600 rounded-lg space-y-4">
                             <p className="text-sm text-gray-300 leading-relaxed text-center">
-                                验证链接已生成。请去 Wikidot 完成绑定。
+                                验证链接已生成。请前往 Wikidot 完成授权绑定。
                             </p>
                             
                             <a 
@@ -162,7 +166,7 @@ export default function Register() {
                                 disabled={loading}
                                 className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                             >
-                                {loading ? '正在入库...' : '我已完成绑定，确认注册'}
+                                {loading ? '正在写入数据库...' : '我已完成绑定，确认注册'}
                             </button>
 
                             <button 
@@ -170,7 +174,7 @@ export default function Register() {
                                 onClick={() => setStep(1)} 
                                 className="w-full py-2 text-gray-400 hover:text-white text-sm transition-colors mt-2"
                             >
-                                返回修改名称
+                                返回上一步
                             </button>
                         </div>
                     )}
