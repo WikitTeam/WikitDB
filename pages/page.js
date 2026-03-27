@@ -2,9 +2,45 @@ import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import TradingChart from '../components/TradingChart';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Filler,
+  Legend,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
 
 const config = require('../wikitdb.config.js');
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Filler,
+  Legend
+);
+
+const stockCrosshairPlugin = {
+    id: 'stockCrosshair',
+    beforeDatasetsDraw: (chart) => {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'; 
+        ctx.shadowBlur = 8; 
+        ctx.shadowOffsetY = 4; 
+    },
+    afterDatasetsDraw: (chart) => {
+        chart.ctx.restore();
+    }
+};
 
 const PageDetail = () => {
     const router = useRouter();
@@ -19,13 +55,14 @@ const PageDetail = () => {
     const [maxHpage, setMaxHpage] = useState(1);
     const [historyLoading, setHistoryLoading] = useState(false);
 
-    // 交易面板表单状态
+    // 交易弹窗及资金状态
     const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
-    const [tradeDirection, setTradeDirection] = useState('long'); 
+    const [tradeDirection, setTradeDirection] = useState('long');
     const [margin, setMargin] = useState('');
     const [lockType, setLockType] = useState('T1 (24h)');
     const [leverage, setLeverage] = useState('2x');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [userBalance, setUserBalance] = useState(null); // <--- 新增存储余额
 
     const tabs = ['源码', '信息', '历史', '评分'];
 
@@ -88,16 +125,31 @@ const PageDetail = () => {
         };
     }, [router.isReady, site, page]);
 
-    const handleOpenTradeModal = () => {
+    // 打开交易弹窗时，顺便去后端查一下这个人有多少钱
+    const handleOpenTradeModal = async () => {
         const username = localStorage.getItem('username');
         if (!username) {
             alert('请先登录后再进行交易操作');
             router.push('/login');
             return;
         }
+
+        try {
+            const res = await fetch(`/api/user?username=${encodeURIComponent(username)}`);
+            if (res.ok) {
+                const data = await res.json();
+                setUserBalance(data.balance);
+            } else {
+                setUserBalance(0);
+            }
+        } catch (e) {
+            setUserBalance(0);
+        }
+
         setIsTradeModalOpen(true);
     };
 
+    // 提交开仓前，先在前端做一次基础拦截
     const handleTradeSubmit = async () => {
         const username = localStorage.getItem('username');
         if (!username) {
@@ -106,8 +158,15 @@ const PageDetail = () => {
             return;
         }
 
-        if (!margin) {
-            alert('请输入保证金金额');
+        const marginNum = Number(margin);
+        if (!margin || isNaN(marginNum) || marginNum <= 0) {
+            alert('请输入有效的保证金金额');
+            return;
+        }
+
+        const totalCost = marginNum * 1.01; // 本金 + 1%手续费
+        if (userBalance !== null && totalCost > userBalance) {
+            alert(`余额不足！开仓需要 ${totalCost.toFixed(2)}，当前可用 ${userBalance.toFixed(2)}`);
             return;
         }
 
@@ -161,40 +220,99 @@ const PageDetail = () => {
     if (!data) return null;
 
     let chartData = [];
-    let markers = [];
-
     if (data.scoreHistory && data.scoreHistory.length > 0) {
-        // 把后端给的数据转成交易图表需要的格式
-        chartData = data.scoreHistory.map((item, index, arr) => {
-            let timeValue = item.date;
-            if (timeValue === '初始记录' || timeValue === '开仓') {
-                timeValue = data.scoreHistory[1]?.date || new Date().toISOString().split('T')[0];
-            }
-
-            const currentScore = 100 + item.score;
-            const prevScore = index === 0 ? 100 : 100 + arr[index - 1].score;
-
-            return {
-                time: timeValue,
-                value: currentScore, 
-                open: prevScore,     
-                close: currentScore, 
-                high: Math.max(prevScore, currentScore) + 0.5,
-                low: Math.min(prevScore, currentScore) - 0.5,
-            };
-        });
-
-        // 默认放个做多标记做演示，之后可以换成真实交易数据
-        markers = [
-            {
-                time: chartData[chartData.length - 1].time,
-                position: 'belowBar',
-                color: '#16a34a',
-                shape: 'arrowUp',
-                text: '做多',
-            }
-        ];
+        chartData = data.scoreHistory.map((item) => ({
+            originalScore: item.score,
+            stockPrice: 100 + item.score,
+            date: item.date
+        }));
+        
+        if (chartData[0].date === '初始记录') {
+            chartData[0].originalScore = 0;
+            chartData[0].stockPrice = 100;
+            chartData[0].date = '开仓';
+        } else {
+            chartData.unshift({ originalScore: 0, stockPrice: 100, date: '开仓' });
+        }
     }
+
+    const lineChartData = {
+        labels: chartData.map(d => d.date),
+        datasets: [
+            {
+                label: '页面大盘',
+                data: chartData.map(d => d.stockPrice),
+                borderColor: '#00bcd4', 
+                backgroundColor: 'rgba(0, 188, 212, 0.1)', 
+                fill: true,
+                borderWidth: 2,
+                tension: 0, 
+                pointRadius: 0, 
+                pointHoverRadius: 5,
+                pointBackgroundColor: '#00bcd4',
+            }
+        ]
+    };
+
+    const lineChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+            padding: { top: 20, bottom: 20, left: 10, right: 10 }
+        },
+        scales: {
+            y: {
+                position: 'right', 
+                suggestedMin: 80,
+                suggestedMax: 120,
+                ticks: {
+                    color: '#6b7280',
+                    font: { size: 12, family: 'sans-serif' }
+                },
+                grid: {
+                    color: '#f3f4f6', 
+                    drawBorder: false,
+                }
+            },
+            x: {
+                ticks: {
+                    color: '#9ca3af',
+                    maxTicksLimit: 8,
+                    font: { size: 11, family: 'sans-serif' }
+                },
+                grid: {
+                    color: '#f3f4f6',
+                    drawBorder: false,
+                }
+            }
+        },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                backgroundColor: 'rgba(17, 24, 39, 0.8)',
+                titleColor: '#fff',
+                bodyColor: '#fff',
+                padding: 10,
+                displayColors: false,
+                intersect: false,
+                mode: 'index',
+                callbacks: {
+                    label: function(context) {
+                        return `现价: ${context.parsed.y.toFixed(2)}`;
+                    }
+                }
+            }
+        },
+        interaction: {
+            intersect: false,
+            mode: 'index',
+        },
+    };
+
+    // 动态计算用户输入保证金后的手续费和总扣款
+    const marginAmount = Number(margin) || 0;
+    const estFee = marginAmount * 0.01;
+    const totalDeduct = marginAmount + estFee;
 
     return (
         <>
@@ -202,8 +320,9 @@ const PageDetail = () => {
                 <title>{`${data.title} - ${config.SITE_NAME}`}</title>
             </Head>
 
+            {/* 开仓交易面板 */}
             {isTradeModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
                     <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl m-4">
                         <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
                             开仓 <span className="text-gray-500 font-normal ml-2 text-base truncate max-w-[200px]">{data.title}</span>
@@ -245,8 +364,15 @@ const PageDetail = () => {
                                     <option value="T7 (168h)">T7 (168h)</option>
                                 </select>
                             </div>
+                            
                             <div>
-                                <label className="block text-sm text-gray-500 mb-1.5">保证金</label>
+                                {/* 在这里显示可用余额 */}
+                                <div className="flex justify-between items-center mb-1.5">
+                                    <label className="block text-sm text-gray-500">保证金</label>
+                                    <span className="text-xs font-bold text-blue-600">
+                                        可用: {userBalance !== null ? userBalance.toFixed(2) : '--'}
+                                    </span>
+                                </div>
                                 <input 
                                     type="number" 
                                     value={margin}
@@ -255,6 +381,7 @@ const PageDetail = () => {
                                     placeholder="输入金额"
                                 />
                             </div>
+                            
                             <div>
                                 <label className="block text-sm text-gray-500 mb-1.5">杠杆</label>
                                 <select 
@@ -269,8 +396,10 @@ const PageDetail = () => {
                             </div>
                         </div>
 
-                        <div className="text-sm text-gray-500 mb-8 mt-4">
-                            预估手续费: 约等于保证金的 1%
+                        {/* 动态显示手续费计算结果 */}
+                        <div className="text-sm text-gray-500 mb-8 mt-4 flex justify-between bg-gray-50 p-2 rounded">
+                            <span>预估手续费 (1%): <strong className="text-gray-700">{estFee.toFixed(2)}</strong></span>
+                            <span>总扣除: <strong className={totalDeduct > (userBalance || 0) ? 'text-red-500' : 'text-blue-600'}>{totalDeduct.toFixed(2)}</strong></span>
                         </div>
 
                         <div className="flex justify-end gap-3 mt-4">
@@ -286,7 +415,7 @@ const PageDetail = () => {
                                 disabled={isSubmitting}
                                 className="px-5 py-2.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-medium transition-colors shadow-lg disabled:opacity-50"
                             >
-                                {isSubmitting ? '提交中...' : '确认开仓'}
+                                {isSubmitting ? '处理中...' : '确认开仓'}
                             </button>
                         </div>
                     </div>
@@ -537,7 +666,7 @@ const PageDetail = () => {
                                         <div>
                                             <div className="text-xs text-gray-500 mb-1 tracking-wider uppercase">{data.title} 的股票</div>
                                             <div className="text-4xl font-bold text-gray-900 leading-none">
-                                                {chartData[chartData.length - 1].value.toFixed(4)}
+                                                {chartData[chartData.length - 1].stockPrice.toFixed(4)}
                                             </div>
                                         </div>
                                         <button 
@@ -548,7 +677,7 @@ const PageDetail = () => {
                                         </button>
                                     </div>
                                     <div className="w-full h-[320px] relative border border-gray-100 rounded overflow-hidden">
-                                        <TradingChart data={chartData} markers={markers} isCandle={false} />
+                                        <Line data={lineChartData} options={lineChartOptions} plugins={[stockCrosshairPlugin]} />
                                     </div>
                                 </div>
                             ) : (
