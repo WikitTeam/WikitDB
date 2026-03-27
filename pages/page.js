@@ -181,6 +181,7 @@ const PageDetail = () => {
                 },
                 borderWidth: 3,
                 tension: 0, 
+                stepped: true,
                 pointBackgroundColor: neonColor,
                 pointBorderColor: '#ffffff',
                 pointBorderWidth: 2,
