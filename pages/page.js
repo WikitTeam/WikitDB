@@ -28,6 +28,22 @@ ChartJS.register(
   Legend
 );
 
+// 让线发光的插件
+const neonGlowPlugin = {
+    id: 'neonGlow',
+    beforeDatasetsDraw: (chart) => {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.shadowColor = chart.data.datasets[0].borderColor;
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+    },
+    afterDatasetsDraw: (chart) => {
+        chart.ctx.restore();
+    }
+};
+
 const PageDetail = () => {
     const router = useRouter();
     const { site, page } = router.query;
@@ -131,38 +147,42 @@ const PageDetail = () => {
         }
     }
 
-    const colorRise = 'rgba(34, 197, 94, 1)'; // 国际绿涨
-    const colorDrop = 'rgba(239, 68, 68, 1)'; // 国际红跌
+    const isNegative = chartData.length > 0 && chartData[chartData.length - 1].score < 0;
+    const neonColor = isNegative ? 'rgba(244, 63, 94, 1)' : 'rgba(56, 189, 248, 1)';
 
     const lineChartData = {
         labels: chartData.map(d => d.date),
         datasets: [
             {
+                fill: 'origin',
                 label: '页面评分',
                 data: chartData.map(d => d.score),
-                borderColor: colorRise,
-                segment: {
-                    borderColor: ctx => {
-                        // 如果当前节点的分数比上一个节点低，就是跌了，画红线
-                        if (!ctx.p0 || !ctx.p1) return colorRise;
-                        return ctx.p1.parsed.y < ctx.p0.parsed.y ? colorDrop : colorRise;
+                borderColor: neonColor,
+                backgroundColor: (context) => {
+                    const chart = context.chart;
+                    const { ctx, chartArea, scales } = chart;
+                    if (!chartArea) return 'transparent';
+                    
+                    const zeroY = scales.y.getPixelForValue(0);
+                    const topY = chartArea.top;
+                    const bottomY = chartArea.bottom;
+                    const gradient = ctx.createLinearGradient(0, topY, 0, bottomY);
+                    const zeroRatio = Math.max(0, Math.min(1, (zeroY - topY) / (bottomY - topY)));
+                    
+                    if (isNegative) {
+                        gradient.addColorStop(0, 'rgba(244, 63, 94, 0)');
+                        gradient.addColorStop(zeroRatio, 'rgba(244, 63, 94, 0)');
+                        gradient.addColorStop(1, 'rgba(244, 63, 94, 0.4)');
+                    } else {
+                        gradient.addColorStop(0, 'rgba(56, 189, 248, 0.4)');
+                        gradient.addColorStop(zeroRatio, 'rgba(56, 189, 248, 0)');
+                        gradient.addColorStop(1, 'rgba(56, 189, 248, 0)');
                     }
+                    return gradient;
                 },
-                fill: {
-                    target: 'origin',
-                    above: 'rgba(34, 197, 94, 0.15)', // 分数大于0区域填充透绿
-                    below: 'rgba(239, 68, 68, 0.15)'  // 分数小于0区域填充透红
-                },
-                borderWidth: 2,
-                tension: 0, 
-                stepped: true,
-                pointBackgroundColor: (ctx) => {
-                    // 鼠标放上去时显示的点，也跟着前一天的涨跌状态变色
-                    if (ctx.dataIndex === 0) return colorRise;
-                    const prev = chartData[ctx.dataIndex - 1].score;
-                    const curr = chartData[ctx.dataIndex].score;
-                    return curr < prev ? colorDrop : colorRise;
-                },
+                borderWidth: 3,
+                tension: 0.4, 
+                pointBackgroundColor: neonColor,
                 pointBorderColor: '#ffffff',
                 pointBorderWidth: 2,
                 pointRadius: 0, 
@@ -185,7 +205,7 @@ const PageDetail = () => {
                     precision: 0, 
                     stepSize: 10, 
                     color: '#9CA3AF',
-                    font: { size: 12, family: 'monospace' }
+                    font: { size: 12 }
                 },
                 grid: {
                     color: (context) => context.tick.value === 0 ? 'rgba(107, 114, 128, 0.5)' : 'rgba(55, 65, 81, 0.3)',
@@ -197,7 +217,7 @@ const PageDetail = () => {
                 ticks: {
                     color: '#9CA3AF',
                     maxTicksLimit: 8,
-                    font: { size: 10, family: 'monospace' }
+                    font: { size: 10 }
                 },
                 grid: {
                     display: false
@@ -210,15 +230,7 @@ const PageDetail = () => {
                 backgroundColor: 'rgba(17, 24, 39, 0.9)',
                 titleColor: '#9CA3AF',
                 bodyColor: '#FFFFFF',
-                bodyFont: { family: 'monospace', size: 14, weight: 'bold' },
-                borderColor: (context) => {
-                    if (!context.tooltip.dataPoints || context.tooltip.dataPoints.length === 0) return colorRise;
-                    const dataIndex = context.tooltip.dataPoints[0].dataIndex;
-                    if (dataIndex === 0) return colorRise;
-                    const prev = chartData[dataIndex - 1].score;
-                    const curr = chartData[dataIndex].score;
-                    return curr < prev ? colorDrop : colorRise;
-                },
+                borderColor: neonColor,
                 borderWidth: 1,
                 padding: 12,
                 displayColors: false,
@@ -509,7 +521,7 @@ const PageDetail = () => {
                                         <i className="fa-solid fa-chart-line text-indigo-400"></i> 按日评分走势
                                     </h3>
                                     <div className="w-full h-[320px] relative">
-                                        <Line data={lineChartData} options={lineChartOptions} />
+                                        <Line data={lineChartData} options={lineChartOptions} plugins={[neonGlowPlugin]} />
                                     </div>
                                 </div>
                             ) : (
