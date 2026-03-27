@@ -8,7 +8,6 @@ export default function Register() {
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     
-    // 控制当前在哪个步骤：1是填账号密码，2是显示验证链接
     const [step, setStep] = useState(1);
     const [verifyUrl, setVerifyUrl] = useState('');
 
@@ -17,12 +16,11 @@ export default function Register() {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // 第一步：点击注册，生成并请求验证链接
-    const handleInitiateRegister = async (e) => {
+    const handleRegisterStart = async (e) => {
         e.preventDefault();
         
         if (!formData.username || !formData.password) {
-            setMessage('请填写名字和密码');
+            setMessage('名字和密码都要写啊');
             return;
         }
 
@@ -39,24 +37,33 @@ export default function Register() {
                 body: JSON.stringify({ qq, token })
             });
 
-            const text = await res.text();
-            let url = text.match(/https?:\/\/[^\s"]+/) ? text.match(/https?:\/\/[^\s"]+/)[0] : text;
+            const rawText = await res.text();
+            let url = '';
             
-            if (url.includes('http')) {
+            try {
+                // 必须正经解析 JSON，才能完美过滤掉多余的结构和转义符
+                const data = JSON.parse(rawText);
+                url = data.url || data.link || data.data || '';
+            } catch (err) {
+                // 兜底逻辑：如果后端返回的不是标准 JSON，再用正则提取
+                const match = rawText.match(/https?:\/\/[^\s"'\\]+/);
+                if (match) url = match[0];
+            }
+
+            if (url && url.startsWith('http')) {
                 setVerifyUrl(url);
-                setStep(2); // 成功拿到链接，进入第二步
+                setStep(2);
             } else {
-                setMessage('验证接口未返回有效链接');
+                setMessage('验证接口没给有效的链接');
             }
         } catch (err) {
-            setMessage('获取验证链接失败，请检查网络');
+            setMessage('网络不太行，获取不到验证链接');
         } finally {
             setLoading(false);
         }
     };
 
-    // 第二步：用户绑完后点击确认，提交给数据库
-    const handleConfirmRegister = async () => {
+    const handleFinalSubmit = async () => {
         setLoading(true);
         setMessage('');
 
@@ -68,18 +75,17 @@ export default function Register() {
             });
             
             if (res.ok) {
-                // 存入本地立刻生效，Header 就可以显示名字了
                 localStorage.setItem('username', formData.username);
-                setMessage('注册成功！正在跳转...');
+                setMessage('注册成功！正在进入首页...');
                 setTimeout(() => {
                     router.push('/');
                 }, 1000);
             } else {
                 const data = await res.json();
-                setMessage(data.error || '注册失败');
+                setMessage(data.error || '数据库不给存，换个名字试试？');
             }
         } catch (err) {
-            setMessage('服务器提交异常');
+            setMessage('提交失败，后端可能挂了');
         } finally {
             setLoading(false);
         }
@@ -100,8 +106,7 @@ export default function Register() {
                     </div>
                 )}
                 
-                <form onSubmit={step === 1 ? handleInitiateRegister : (e) => e.preventDefault()} className="space-y-4">
-                    {/* 步骤 1：只显示名字和密码 */}
+                <form onSubmit={step === 1 ? handleRegisterStart : (e) => e.preventDefault()} className="space-y-4">
                     {step === 1 && (
                         <>
                             <div>
@@ -129,18 +134,17 @@ export default function Register() {
                             <button 
                                 type="submit" 
                                 disabled={loading} 
-                                className="w-full text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-lg text-sm px-5 py-2.5 mt-6 transition-all disabled:opacity-50 shadow-lg"
+                                className="w-full text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-lg text-sm px-5 py-2.5 mt-6 transition-all disabled:opacity-50"
                             >
-                                {loading ? '正在请求验证...' : '注册并验证 Wikidot'}
+                                {loading ? '正在通信...' : '注册并验证 Wikidot'}
                             </button>
                         </>
                     )}
 
-                    {/* 步骤 2：隐藏输入框，只显示验证链接和确认按钮 */}
                     {step === 2 && (
                         <div className="p-4 bg-gray-900/50 border border-gray-600 rounded-lg space-y-4">
                             <p className="text-sm text-gray-300 leading-relaxed text-center">
-                                验证链接已生成。请点击下方按钮前往授权绑定，完成后点击确认。
+                                验证链接已生成。请去 Wikidot 完成绑定。
                             </p>
                             
                             <a 
@@ -154,20 +158,19 @@ export default function Register() {
                             
                             <button 
                                 type="button" 
-                                onClick={handleConfirmRegister} 
+                                onClick={handleFinalSubmit} 
                                 disabled={loading}
                                 className="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                             >
-                                {loading ? '正在提交...' : '我已完成绑定，确认注册'}
+                                {loading ? '正在入库...' : '我已完成绑定，确认注册'}
                             </button>
 
                             <button 
                                 type="button" 
                                 onClick={() => setStep(1)} 
-                                disabled={loading}
                                 className="w-full py-2 text-gray-400 hover:text-white text-sm transition-colors mt-2"
                             >
-                                返回修改信息
+                                返回修改名称
                             </button>
                         </div>
                     )}
