@@ -28,7 +28,6 @@ ChartJS.register(
   Legend
 );
 
-// 炒股软件专属的十字线阴影插件
 const stockCrosshairPlugin = {
     id: 'stockCrosshair',
     beforeDatasetsDraw: (chart) => {
@@ -134,7 +133,6 @@ const PageDetail = () => {
 
     let chartData = [];
     if (data.scoreHistory && data.scoreHistory.length > 0) {
-        // 核心逻辑：把所有评分映射到 100 元的发行价上
         chartData = data.scoreHistory.map((item) => ({
             originalScore: item.score,
             stockPrice: 100 + item.score,
@@ -144,13 +142,12 @@ const PageDetail = () => {
         if (chartData[0].date === '初始记录') {
             chartData[0].originalScore = 0;
             chartData[0].stockPrice = 100;
-            chartData[0].date = '首发上市';
+            chartData[0].date = '开仓';
         } else {
-            chartData.unshift({ originalScore: 0, stockPrice: 100, date: '首发上市' });
+            chartData.unshift({ originalScore: 0, stockPrice: 100, date: '开仓' });
         }
     }
 
-    // A 股标准：红涨绿跌
     const colorRise = 'rgba(239, 68, 68, 1)'; 
     const colorDrop = 'rgba(34, 197, 94, 1)'; 
     const bgRise = 'rgba(239, 68, 68, 0.2)';
@@ -199,7 +196,7 @@ const PageDetail = () => {
         },
         scales: {
             y: {
-                suggestedMin: 80, // 股市需要一定的上下浮动空间
+                suggestedMin: 80,
                 suggestedMax: 120,
                 ticks: {
                     precision: 0, 
@@ -212,7 +209,6 @@ const PageDetail = () => {
                     font: { size: 12, family: 'monospace', weight: 'bold' }
                 },
                 grid: {
-                    // 100 元基准线加粗加亮
                     color: (context) => context.tick.value === 100 ? 'rgba(255, 255, 255, 0.4)' : 'rgba(55, 65, 81, 0.3)',
                     lineWidth: (context) => context.tick.value === 100 ? 2 : 1,
                     borderDash: (context) => context.tick.value === 100 ? [] : [4, 4],
