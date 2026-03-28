@@ -2,17 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
 
-// 独立的页面交易卡片组件
-const PageTradeCard = ({ pageData, username }) => {
+const PageTradeCard = ({ pageData, username, onTradeSuccess }) => {
     const [direction, setDirection] = useState('long');
     const [margin, setMargin] = useState(100);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [message, setMessage] = useState('');
-    const [statusType, setStatusType] = useState(''); // 'success' 或 'error'
+    const [statusType, setStatusType] = useState(''); 
 
     const handleSubmit = async () => {
         if (!username) {
-            setMessage('请先在顶部设置操作账户');
+            setMessage('请先在顶栏登录');
             setStatusType('error');
             return;
         }
@@ -32,14 +31,14 @@ const PageTradeCard = ({ pageData, username }) => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    username,
+                    username, // 强制使用系统读取的真实用户名
                     site: pageData.wiki,
                     pageId: pageData.page,
                     pageTitle: pageData.title,
                     direction,
-                    lockType: 'none', // 快捷模式默认不锁仓
+                    lockType: 'none',
                     margin: marginNum,
-                    leverage: 1       // 快捷模式默认1倍杠杆
+                    leverage: 1
                 })
             });
 
@@ -49,8 +48,9 @@ const PageTradeCard = ({ pageData, username }) => {
                 setMessage(data.error || '开仓失败');
                 setStatusType('error');
             } else {
-                setMessage(`开仓成功！最新余额: ¥${data.newBalance.toFixed(2)}`);
+                setMessage('开仓成功！');
                 setStatusType('success');
+                onTradeSuccess(data.newBalance); // 通知父组件更新全局余额
             }
         } catch (error) {
             setMessage('网络错误，请检查接口');
@@ -62,7 +62,6 @@ const PageTradeCard = ({ pageData, username }) => {
 
     return (
         <div className="bg-gray-800/40 rounded-xl border border-gray-700 p-5 flex flex-col justify-between hover:border-gray-500 transition-colors shadow-lg">
-            {/* 顶部：标的信息 */}
             <div className="mb-4">
                 <div className="text-white font-bold text-lg leading-snug break-all mb-2 line-clamp-2" title={pageData.title}>
                     {pageData.title}
@@ -73,7 +72,6 @@ const PageTradeCard = ({ pageData, username }) => {
                 </div>
             </div>
             
-            {/* 中间：快捷参数输入 */}
             <div className="flex gap-3 mb-4 mt-auto">
                 <div className="flex-1">
                     <label className="block text-xs text-gray-500 mb-1">方向</label>
@@ -93,23 +91,24 @@ const PageTradeCard = ({ pageData, username }) => {
                         min="1"
                         value={margin}
                         onChange={(e) => setMargin(e.target.value)}
-                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-sm font-mono"
+                        disabled={!username}
+                        className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-sm font-mono disabled:bg-gray-800 disabled:text-gray-500"
                         placeholder="金额"
                     />
                 </div>
             </div>
 
-            {/* 底部：操作按钮与反馈 */}
             <button 
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !username}
                 className={`w-full py-2.5 rounded-lg font-bold text-white text-sm transition-colors ${
+                    !username ? 'bg-gray-700 text-gray-500 cursor-not-allowed' :
                     isSubmitting ? 'bg-gray-600 cursor-not-allowed' : 
                     direction === 'long' ? 'bg-green-600 hover:bg-green-500 shadow-[0_0_15px_rgba(22,163,74,0.3)]' : 
                     'bg-red-600 hover:bg-red-500 shadow-[0_0_15px_rgba(220,38,38,0.3)]'
                 }`}
             >
-                {isSubmitting ? '正在提交...' : direction === 'long' ? '确认买入 (做多)' : '确认买入 (做空)'}
+                {!username ? '未登录' : isSubmitting ? '正在提交...' : direction === 'long' ? '确认买入 (做多)' : '确认买入 (做空)'}
             </button>
 
             {message && (
@@ -127,13 +126,28 @@ export default function QualityJudge() {
     const [recentPages, setRecentPages] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     
-    // 全局操作账户设置
-    const [globalUsername, setGlobalUsername] = useState('Laimu_slime');
+    const [username, setUsername] = useState(null);
+    const [userBalance, setUserBalance] = useState(0);
 
     useEffect(() => {
+        const storedUsername = localStorage.getItem('username');
+        if (storedUsername) {
+            setUsername(storedUsername);
+            // 复用 author 接口的 query 功能去拉取真实余额
+            fetch('/api/trade/author', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: storedUsername, authorName: 'System', action: 'query' })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.newBalance !== undefined) setUserBalance(data.newBalance);
+            })
+            .catch(console.error);
+        }
+
         const fetchRecentPages = async () => {
             try {
-                // 拉取 12 条数据填满网格
                 const query = {
                     query: `
                         query {
@@ -173,33 +187,28 @@ export default function QualityJudge() {
             </Head>
 
             <div className="flex flex-col gap-6 pb-12">
-                <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-gray-800 pb-4 gap-4">
+                <div className="flex justify-between items-end border-b border-gray-800 pb-4">
                     <div>
                         <h1 className="text-3xl font-bold text-white tracking-tight">页面质量评断与打新</h1>
-                        <p className="mt-2 text-gray-400 text-sm">自动抓取各站最新发布的页面。直接在卡片上设置投资额并快速开仓。</p>
+                        <p className="mt-2 text-gray-400 text-sm">自动抓取各站最新发布的页面。在信息流中快速做多或做空未来的评分。</p>
                     </div>
                     
-                    {/* 全局用户设置区域 */}
-                    <div className="bg-gray-800/60 p-3.5 rounded-xl border border-gray-700 w-full md:w-auto flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-900/50 text-blue-400 rounded-lg flex items-center justify-center text-lg">
-                            <i className="fa-solid fa-wallet"></i>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-gray-500 mb-1">当前操作账户 (暂代登录)</label>
-                            <input 
-                                type="text" 
-                                value={globalUsername}
-                                onChange={(e) => setGlobalUsername(e.target.value)}
-                                className="w-full md:w-48 bg-gray-900 border border-gray-600 rounded px-3 py-1 text-white focus:outline-none focus:border-blue-500 text-sm font-mono"
-                                placeholder="输入用户名"
-                            />
-                        </div>
+                    <div className="text-right hidden md:block">
+                        {username ? (
+                            <>
+                                <div className="text-gray-400 text-sm">操作账户: <span className="text-gray-200">{username}</span></div>
+                                <div className="text-2xl font-mono text-cyan-400">¥{userBalance.toFixed(2)}</div>
+                            </>
+                        ) : (
+                            <div className="text-red-400 font-bold border border-red-900/50 bg-red-900/20 px-4 py-2 rounded-lg">
+                                未登录，请先在顶栏登录
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {isLoading ? (
                     <div className="flex justify-center items-center py-20 text-blue-500 gap-3 font-mono">
-                        <i className="fa-solid fa-circle-notch animate-spin text-xl"></i>
                         正在接入全网节点拉取最新页面数据...
                     </div>
                 ) : recentPages.length === 0 ? (
@@ -212,7 +221,8 @@ export default function QualityJudge() {
                             <PageTradeCard 
                                 key={`${pageData.wiki}-${pageData.page}`} 
                                 pageData={pageData} 
-                                username={globalUsername} 
+                                username={username} 
+                                onTradeSuccess={(newBal) => setUserBalance(newBal)}
                             />
                         ))}
                     </div>
