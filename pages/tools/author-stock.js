@@ -4,17 +4,49 @@ import Head from 'next/head';
 import TradingChart from '../../components/TradingChart';
 
 export default function AuthorStock() {
-    const [username, setUsername] = useState('Laimu_slime');
+    // 默认设为 null，等待从本地存储读取
+    const [username, setUsername] = useState(null);
     const [selectedAuthor, setSelectedAuthor] = useState('Laimu_slime');
     const [chartData, setChartData] = useState([]);
     
-    const [userBalance, setUserBalance] = useState(10000);
+    const [userBalance, setUserBalance] = useState(0);
     const [userPosition, setUserPosition] = useState(0);
-    
-    // 新增：自定义交易股数
     const [tradeAmount, setTradeAmount] = useState(10);
 
-    // 拉取K线和账户数据
+    // 组件挂载时，自动从本地读取真实登录状态
+    useEffect(() => {
+        const storedUsername = localStorage.getItem('username');
+        if (storedUsername) {
+            setUsername(storedUsername);
+            fetchUserData(storedUsername); // 拿到用户名后，去拉取他的真实余额
+        }
+    }, []);
+
+    // 独立拉取用户余额和持仓的函数
+    const fetchUserData = async (uname) => {
+        try {
+            // 这里我们复用一下获取用户信息的方法，或者直接让后端在查价时顺带返回
+            // 为了简单，我们先通过查一下某作者股份来顺带拿到余额
+            const res = await fetch('/api/trade/author', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    username: uname, 
+                    authorName: selectedAuthor, 
+                    action: 'query' // 假设后端支持纯查询操作
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setUserBalance(data.newBalance || 10000);
+                setUserPosition(data.newPosition || 0);
+            }
+        } catch (error) {
+            console.error("加载账户数据失败", error);
+        }
+    };
+
+    // 监听作者变化时，重新拉取K线和该作者的持仓
     useEffect(() => {
         const fetchStockData = async () => {
             if (!selectedAuthor) return;
@@ -31,16 +63,20 @@ export default function AuthorStock() {
 
         const delayDebounceFn = setTimeout(() => {
             fetchStockData();
+            if (username) fetchUserData(username);
         }, 500);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [selectedAuthor]);
+    }, [selectedAuthor, username]);
 
     const handleBuy = async () => {
+        if (!username) {
+            alert('请先登录后再进行交易！');
+            return;
+        }
         if (chartData.length === 0) return;
-        const currentPrice = chartData[chartData.length - 1].close;
+        
         const amountNum = Number(tradeAmount);
-
         if (isNaN(amountNum) || amountNum <= 0) {
             alert('请输入有效的买入股数');
             return;
@@ -51,11 +87,10 @@ export default function AuthorStock() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    username, 
+                    username, // 提交本地存储中真实的用户名
                     authorName: selectedAuthor, 
                     action: 'buy', 
-                    currentPrice, 
-                    amount: amountNum // 传递数量给后端
+                    amount: amountNum 
                 })
             });
             const data = await res.json();
@@ -63,7 +98,7 @@ export default function AuthorStock() {
             if (res.ok) {
                 setUserBalance(data.newBalance);
                 setUserPosition(data.newPosition);
-                alert(`成功买入 ${amountNum} 股！花费: ¥${(currentPrice * amountNum).toFixed(2)}`);
+                alert(`成功买入 ${amountNum} 股！成交均价: ¥${data.executedPrice.toFixed(2)}`);
             } else {
                 alert(data.error || '买入失败');
             }
@@ -73,10 +108,13 @@ export default function AuthorStock() {
     };
 
     const handleSell = async () => {
+        if (!username) {
+            alert('请先登录后再进行交易！');
+            return;
+        }
         if (chartData.length === 0 || userPosition <= 0) return;
-        const currentPrice = chartData[chartData.length - 1].close;
+        
         const amountNum = Number(tradeAmount);
-
         if (isNaN(amountNum) || amountNum <= 0) {
             alert('请输入有效的卖出股数');
             return;
@@ -92,11 +130,10 @@ export default function AuthorStock() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    username, 
+                    username, // 提交本地存储中真实的用户名
                     authorName: selectedAuthor, 
                     action: 'sell', 
-                    currentPrice,
-                    amount: amountNum // 传递数量给后端
+                    amount: amountNum 
                 })
             });
             const data = await res.json();
@@ -104,7 +141,7 @@ export default function AuthorStock() {
             if (res.ok) {
                 setUserBalance(data.newBalance);
                 setUserPosition(data.newPosition);
-                alert(`成功卖出 ${amountNum} 股！收入: ¥${(currentPrice * amountNum).toFixed(2)}`);
+                alert(`成功卖出 ${amountNum} 股！成交均价: ¥${data.executedPrice.toFixed(2)}`);
             } else {
                 alert(data.error || '卖出失败');
             }
@@ -126,8 +163,16 @@ export default function AuthorStock() {
                         <p className="mt-2 text-gray-400 text-sm">在这里投资你认为有潜力的创作者。股价与发文量、存活率挂钩。</p>
                     </div>
                     <div className="text-right">
-                        <div className="text-gray-400 text-sm">可用资金</div>
-                        <div className="text-2xl font-mono text-green-400">¥{userBalance.toFixed(2)}</div>
+                        {username ? (
+                            <>
+                                <div className="text-gray-400 text-sm">操作账户: <span className="text-gray-200">{username}</span></div>
+                                <div className="text-2xl font-mono text-green-400">¥{userBalance.toFixed(2)}</div>
+                            </>
+                        ) : (
+                            <div className="text-red-400 font-bold border border-red-900/50 bg-red-900/20 px-4 py-2 rounded-lg">
+                                未登录，请先在顶栏登录
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -135,15 +180,7 @@ export default function AuthorStock() {
                     <div className="lg:col-span-1 bg-gray-800/40 rounded-xl border border-gray-700 p-6 flex flex-col h-[500px]">
                         
                         <div className="space-y-4 mb-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">操作账户</label>
-                                <input 
-                                    type="text" 
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                                />
-                            </div>
+                            {/* 删除了之前的交易账户输入框 */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1">搜索作者档案</label>
                                 <input 
@@ -169,7 +206,6 @@ export default function AuthorStock() {
                                 </div>
                             </div>
                             
-                            {/* 新增：交易股数输入框 */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1">交易数量 (股)</label>
                                 <input 
@@ -177,7 +213,8 @@ export default function AuthorStock() {
                                     min="1"
                                     value={tradeAmount}
                                     onChange={(e) => setTradeAmount(e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:border-blue-500 transition-colors"
+                                    disabled={!username}
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:border-blue-500 transition-colors disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed"
                                 />
                             </div>
                         </div>
@@ -185,13 +222,15 @@ export default function AuthorStock() {
                         <div className="flex gap-4 mt-auto">
                             <button 
                                 onClick={handleBuy}
-                                className="flex-1 bg-green-600 hover:bg-green-500 text-white font-semibold py-3 rounded-lg transition-colors"
+                                disabled={!username}
+                                className="flex-1 bg-green-600 hover:bg-green-500 text-white font-semibold py-3 rounded-lg transition-colors disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
                             >
                                 买入看涨
                             </button>
                             <button 
                                 onClick={handleSell}
-                                className="flex-1 bg-red-600 hover:bg-red-500 text-white font-semibold py-3 rounded-lg transition-colors"
+                                disabled={!username}
+                                className="flex-1 bg-red-600 hover:bg-red-500 text-white font-semibold py-3 rounded-lg transition-colors disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
                             >
                                 抛售平仓
                             </button>
