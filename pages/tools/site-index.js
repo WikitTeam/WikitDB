@@ -23,22 +23,37 @@ export default function SiteIndex() {
     const [selectedSite, setSelectedSite] = useState(null);
     const [chartData, setChartData] = useState([]);
     
-    const [username, setUsername] = useState('Laimu_slime');
+    const [username, setUsername] = useState(null);
+    const [userBalance, setUserBalance] = useState(0);
+
     const [margin, setMargin] = useState(100);
     const [message, setMessage] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // 初始化时拿到配置文件里的站点列表
     useEffect(() => {
+        const storedUsername = localStorage.getItem('username');
+        if (storedUsername) {
+            setUsername(storedUsername);
+            fetch('/api/trade/author', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: storedUsername, authorName: 'System', action: 'query' })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.newBalance !== undefined) setUserBalance(data.newBalance);
+            })
+            .catch(console.error);
+        }
+
         const wikis = config.SUPPORT_WIKI || config.SUPPOST_WIKI || [];
         setSites(wikis);
         if (wikis.length > 0) setSelectedSite(wikis[0]);
     }, []);
 
-    // 绘制大盘面积走势图
     useEffect(() => {
         if (!selectedSite) return;
         
-        // 模拟大盘的起始点位，按名字长度随便整一个基准值
         let baseIndex = 3000 + (selectedSite.NAME?.length || 5) * 100;
         const data = [];
         const now = new Date();
@@ -46,8 +61,6 @@ export default function SiteIndex() {
         for (let i = 60; i >= 0; i--) {
             const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
             const dateStr = `${date.getMonth() + 1}/${date.getDate()}`;
-            
-            // 模拟大盘的缓和起伏
             const change = (Math.random() - 0.48) * 45; 
             baseIndex = Math.max(1000, baseIndex + change);
             
@@ -62,6 +75,12 @@ export default function SiteIndex() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        if (!username) {
+            setMessage('请先登录后再进行交易！');
+            return;
+        }
+
+        setIsSubmitting(true);
         setMessage('');
 
         try {
@@ -73,7 +92,7 @@ export default function SiteIndex() {
                     site: selectedSite.PARAM,
                     pageId: 'index',
                     pageTitle: `[ETF] ${selectedSite.NAME || selectedSite.PARAM} 大盘指数`,
-                    direction: 'long', // 基金默认只做多
+                    direction: 'long', 
                     lockType: 'time',
                     margin: Number(margin),
                     leverage: 1
@@ -85,10 +104,13 @@ export default function SiteIndex() {
             if (!res.ok) {
                 setMessage(data.error || '认购失败');
             } else {
-                setMessage(`认购成功！份额已确认，余额: ¥${data.newBalance.toFixed(2)}`);
+                setUserBalance(data.newBalance);
+                setMessage('认购成功！份额已确认。');
             }
         } catch (error) {
             setMessage('网络错误，请检查接口');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -99,9 +121,23 @@ export default function SiteIndex() {
             </Head>
 
             <div className="flex flex-col gap-6">
-                <div className="border-b border-gray-800 pb-4">
-                    <h1 className="text-3xl font-bold text-white tracking-tight">站点大盘指数基金 (ETF)</h1>
-                    <p className="mt-2 text-gray-400 text-sm">将各分站的繁荣度量化为点数。认购指数基金，享受大盘整体上升带来的红利。</p>
+                <div className="flex justify-between items-end border-b border-gray-800 pb-4">
+                    <div>
+                        <h1 className="text-3xl font-bold text-white tracking-tight">站点大盘指数基金 (ETF)</h1>
+                        <p className="mt-2 text-gray-400 text-sm">将各分站的繁荣度量化为点数。认购指数基金，享受大盘整体上升带来的红利。</p>
+                    </div>
+                    <div className="text-right hidden md:block">
+                        {username ? (
+                            <>
+                                <div className="text-gray-400 text-sm">操作账户: <span className="text-gray-200">{username}</span></div>
+                                <div className="text-2xl font-mono text-cyan-400">¥{userBalance.toFixed(2)}</div>
+                            </>
+                        ) : (
+                            <div className="text-red-400 font-bold border border-red-900/50 bg-red-900/20 px-4 py-2 rounded-lg">
+                                未登录，请先在顶栏登录
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -117,14 +153,12 @@ export default function SiteIndex() {
                                         : 'bg-gray-800/60 text-gray-400 hover:bg-gray-700'
                                     }`}
                                 >
-                                    <i className="fa-solid fa-chart-area mr-2 opacity-70"></i>
                                     {site.NAME || site.PARAM}
                                 </button>
                             ))}
                         </div>
 
                         <div className="bg-gray-800/40 rounded-xl border border-gray-700 p-6 h-[450px] shadow-lg relative">
-                            {/* 背景光晕装饰 */}
                             <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-900/10 rounded-full blur-[80px] pointer-events-none"></div>
                             
                             <ResponsiveContainer width="100%" height="100%">
@@ -164,23 +198,14 @@ export default function SiteIndex() {
 
                         <form onSubmit={handleSubmit} className="space-y-4 flex-1 flex flex-col">
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-1">交易账户</label>
-                                <input 
-                                    type="text" 
-                                    value={username}
-                                    onChange={(e) => setUsername(e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-cyan-500"
-                                />
-                            </div>
-
-                            <div>
                                 <label className="block text-sm font-medium text-gray-400 mb-1">申购金额</label>
                                 <input 
                                     type="number" 
                                     min="1"
                                     value={margin}
                                     onChange={(e) => setMargin(e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:border-cyan-500"
+                                    disabled={!username}
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:border-cyan-500 disabled:bg-gray-800 disabled:text-gray-500"
                                 />
                             </div>
                             
@@ -190,9 +215,13 @@ export default function SiteIndex() {
 
                             <button 
                                 type="submit"
-                                className="w-full py-3 rounded-lg font-bold text-white mt-auto transition-colors shadow-lg bg-cyan-700 hover:bg-cyan-600"
+                                disabled={isSubmitting || !username}
+                                className={`w-full py-3 rounded-lg font-bold text-white mt-auto transition-colors shadow-lg ${
+                                    !username ? 'bg-gray-700 text-gray-500 cursor-not-allowed' :
+                                    isSubmitting ? 'bg-gray-600 cursor-not-allowed' : 'bg-cyan-700 hover:bg-cyan-600'
+                                }`}
                             >
-                                确认认购份额
+                                {!username ? '未登录' : isSubmitting ? '正在处理...' : '确认认购份额'}
                             </button>
                         </form>
 
