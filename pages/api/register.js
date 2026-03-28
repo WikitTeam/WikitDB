@@ -54,7 +54,6 @@ export default async function handler(req, res) {
         if (!tempRecord) return res.status(400).json({ error: '验证会话已过期 (超过24小时) 或不存在' });
 
         try {
-            // 依然使用 bind-query 接口
             const queryRes = await fetch(`https://wikit.unitreaty.org/module/bind-query?qq=${tempRecord.qq}`);
             const rawText = await queryRes.text();
 
@@ -63,12 +62,12 @@ export default async function handler(req, res) {
             try {
                 const responseData = JSON.parse(rawText);
                 
-                // 提取 JSON 里的 id 字段
-                if (responseData.status === 'success' && responseData.data && responseData.data.length > 0) {
-                    wdid = responseData.data[0].id;
+                // 严格按照你提供的 JSON 格式解析
+                if (responseData.status === 'success' && responseData.data && responseData.data.id) {
+                    wdid = responseData.data.id;
                 }
             } catch (e) {
-                // 兼容逻辑：如果接口突然没有返回 JSON，尝试按原文本处理
+                // 兼容逻辑：如果由于网络或其他原因没有返回正常的 JSON，降级处理
                 wdid = rawText.trim();
                 if (wdid.toLowerCase().includes('error') || wdid.includes('<') || wdid === 'false' || wdid === 'null') {
                     wdid = '';
