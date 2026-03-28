@@ -10,7 +10,11 @@ export default function AuthorStock() {
     
     const [userBalance, setUserBalance] = useState(10000);
     const [userPosition, setUserPosition] = useState(0);
+    
+    // 新增：自定义交易股数
+    const [tradeAmount, setTradeAmount] = useState(10);
 
+    // 拉取K线和账户数据
     useEffect(() => {
         const fetchStockData = async () => {
             if (!selectedAuthor) return;
@@ -21,7 +25,7 @@ export default function AuthorStock() {
                     setChartData(result.data);
                 }
             } catch (error) {
-                console.error("加载数据失败", error);
+                console.error("加载图表数据失败", error);
             }
         };
 
@@ -35,19 +39,31 @@ export default function AuthorStock() {
     const handleBuy = async () => {
         if (chartData.length === 0) return;
         const currentPrice = chartData[chartData.length - 1].close;
+        const amountNum = Number(tradeAmount);
+
+        if (isNaN(amountNum) || amountNum <= 0) {
+            alert('请输入有效的买入股数');
+            return;
+        }
         
         try {
             const res = await fetch('/api/trade/author', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, authorName: selectedAuthor, action: 'buy', currentPrice })
+                body: JSON.stringify({ 
+                    username, 
+                    authorName: selectedAuthor, 
+                    action: 'buy', 
+                    currentPrice, 
+                    amount: amountNum // 传递数量给后端
+                })
             });
             const data = await res.json();
             
             if (res.ok) {
                 setUserBalance(data.newBalance);
                 setUserPosition(data.newPosition);
-                alert('买入成功！');
+                alert(`成功买入 ${amountNum} 股！花费: ¥${(currentPrice * amountNum).toFixed(2)}`);
             } else {
                 alert(data.error || '买入失败');
             }
@@ -59,19 +75,36 @@ export default function AuthorStock() {
     const handleSell = async () => {
         if (chartData.length === 0 || userPosition <= 0) return;
         const currentPrice = chartData[chartData.length - 1].close;
+        const amountNum = Number(tradeAmount);
+
+        if (isNaN(amountNum) || amountNum <= 0) {
+            alert('请输入有效的卖出股数');
+            return;
+        }
+
+        if (amountNum > userPosition) {
+            alert(`持仓不足，你当前只有 ${userPosition} 股`);
+            return;
+        }
         
         try {
             const res = await fetch('/api/trade/author', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, authorName: selectedAuthor, action: 'sell', currentPrice })
+                body: JSON.stringify({ 
+                    username, 
+                    authorName: selectedAuthor, 
+                    action: 'sell', 
+                    currentPrice,
+                    amount: amountNum // 传递数量给后端
+                })
             });
             const data = await res.json();
             
             if (res.ok) {
                 setUserBalance(data.newBalance);
                 setUserPosition(data.newPosition);
-                alert('卖出成功！');
+                alert(`成功卖出 ${amountNum} 股！收入: ¥${(currentPrice * amountNum).toFixed(2)}`);
             } else {
                 alert(data.error || '卖出失败');
             }
@@ -100,17 +133,29 @@ export default function AuthorStock() {
 
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                     <div className="lg:col-span-1 bg-gray-800/40 rounded-xl border border-gray-700 p-6 flex flex-col h-[500px]">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-400 mb-2">搜索作者</label>
-                            <input 
-                                type="text" 
-                                value={selectedAuthor}
-                                onChange={(e) => setSelectedAuthor(e.target.value)}
-                                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 transition-colors"
-                            />
+                        
+                        <div className="space-y-4 mb-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">操作账户</label>
+                                <input 
+                                    type="text" 
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">搜索作者档案</label>
+                                <input 
+                                    type="text" 
+                                    value={selectedAuthor}
+                                    onChange={(e) => setSelectedAuthor(e.target.value)}
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                                />
+                            </div>
                         </div>
 
-                        <div className="flex-1 flex flex-col justify-center space-y-4 my-4">
+                        <div className="flex-1 flex flex-col justify-center space-y-4 my-2">
                             <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-700/50">
                                 <div className="flex justify-between items-center mb-2">
                                     <span className="text-gray-400">当前持有</span>
@@ -124,11 +169,16 @@ export default function AuthorStock() {
                                 </div>
                             </div>
                             
-                            <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-800/30">
-                                <div className="text-xs text-blue-400 mb-1 font-semibold">交易提示</div>
-                                <div className="text-sm text-gray-400 leading-relaxed">
-                                    作者的近期发文频率与单篇历史评分将直接驱动 K 线走势。大盘伴随随机波动，请谨慎投资。
-                                </div>
+                            {/* 新增：交易股数输入框 */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-1">交易数量 (股)</label>
+                                <input 
+                                    type="number" 
+                                    min="1"
+                                    value={tradeAmount}
+                                    onChange={(e) => setTradeAmount(e.target.value)}
+                                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:border-blue-500 transition-colors"
+                                />
                             </div>
                         </div>
 
