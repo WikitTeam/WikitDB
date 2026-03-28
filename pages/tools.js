@@ -1,7 +1,6 @@
 import React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-
 const config = require('../wikitdb.config.js');
 
 export default function Tools() {
@@ -17,7 +16,7 @@ export default function Tools() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* 原有功能：档案馆盲盒 */}
+                    {/* 1. 档案馆盲盒 */}
                     <Link href="/tools/gacha" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-purple-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-purple-400 group-hover:text-purple-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -25,14 +24,12 @@ export default function Tools() {
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-white mb-2 group-hover:text-purple-400 transition-colors">档案馆盲盒</h2>
-                                <p className="text-gray-400 text-sm leading-relaxed">
-                                    消耗资产，在浩瀚的数据中随机抽取未知的页面标的进行投资。
-                                </p>
+                                <p className="text-gray-400 text-sm leading-relaxed">消耗资产，在浩瀚的数据中随机抽取未知的页面标的进行投资。</p>
                             </div>
                         </div>
                     </Link>
 
-                    {/* 新增功能：作者概念股 */}
+                    {/* 2. 作者概念股 */}
                     <Link href="/tools/author-stock" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-green-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-green-400 group-hover:text-green-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -40,14 +37,12 @@ export default function Tools() {
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-white mb-2 group-hover:text-green-400 transition-colors">作者概念股</h2>
-                                <p className="text-gray-400 text-sm leading-relaxed">
-                                    投资有潜力的创作者，股价走势与近期发文量、存活率深度挂钩。
-                                </p>
+                                <p className="text-gray-400 text-sm leading-relaxed">投资有潜力的创作者，股价走势与近期发文量、存活率深度挂钩。</p>
                             </div>
                         </div>
                     </Link>
 
-                    {/* 新增功能：页面打新评断 */}
+                    {/* 3. 页面打新评断 */}
                     <Link href="/tools/quality-judge" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-cyan-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-cyan-400 group-hover:text-cyan-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -55,14 +50,12 @@ export default function Tools() {
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-white mb-2 group-hover:text-cyan-400 transition-colors">页面打新评断</h2>
-                                <p className="text-gray-400 text-sm leading-relaxed">
-                                    获取近期最新发布的页面，做多或做空它们未来的评分走向。
-                                </p>
+                                <p className="text-gray-400 text-sm leading-relaxed">获取近期最新发布的页面，在信息流中快速做多或做空未来的评分。</p>
                             </div>
                         </div>
                     </Link>
 
-                    {/* 新增功能：战力雷达评估 */}
+                    {/* 4. 战力雷达评估 */}
                     <Link href="/tools/radar" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-indigo-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-indigo-400 group-hover:text-indigo-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -70,14 +63,12 @@ export default function Tools() {
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-400 transition-colors">战力雷达评估</h2>
-                                <p className="text-gray-400 text-sm leading-relaxed">
-                                    跨站聚合创作者的历史档案，多维度生成雷达图并推算其危险等级。
-                                </p>
+                                <p className="text-gray-400 text-sm leading-relaxed">跨站聚合创作者的历史档案，多维度生成雷达图并推算其危险等级。</p>
                             </div>
                         </div>
                     </Link>
 
-                    {/* 新增功能：代码修复逃脱 */}
+                    {/* 5. 代码修复逃脱 */}
                     <Link href="/tools/escape" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-orange-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-orange-400 group-hover:text-orange-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -85,14 +76,51 @@ export default function Tools() {
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-white mb-2 group-hover:text-orange-400 transition-colors">代码修复逃脱</h2>
-                                <p className="text-gray-400 text-sm leading-relaxed">
-                                    随机抽取受损的页面源码，限时修复排版语法以阻止收容失效。
-                                </p>
+                                <p className="text-gray-400 text-sm leading-relaxed">随机抽取受损的真实页面源码，限时修复排版语法以阻止收容失效。</p>
                             </div>
                         </div>
                     </Link>
 
-                    {/* 原有功能：成员管理 */}
+                    {/* 6. 跨界缝合怪 */}
+                    <Link href="/tools/splice" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-pink-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
+                        <div className="grid grid-cols-[min-content_1fr]">
+                            <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-pink-400 group-hover:text-pink-500 mb-4 mr-4 max-h-14 text-3xl">
+                                <i className="fa-solid fa-puzzle-piece"></i>
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-2 group-hover:text-pink-400 transition-colors">跨界缝合怪</h2>
+                                <p className="text-gray-400 text-sm leading-relaxed">抽取多站点的无关联文本碎片，由你来拼接命名属于你的荒诞故事。</p>
+                            </div>
+                        </div>
+                    </Link>
+
+                    {/* 7. 标签大宗商品 */}
+                    <Link href="/tools/tag-futures" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-yellow-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
+                        <div className="grid grid-cols-[min-content_1fr]">
+                            <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-yellow-400 group-hover:text-yellow-500 mb-4 mr-4 max-h-14 text-3xl">
+                                <i className="fa-solid fa-tags"></i>
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-2 group-hover:text-yellow-400 transition-colors">标签大宗商品</h2>
+                                <p className="text-gray-400 text-sm leading-relaxed">将常见分类标签视作商品，根据近期该标签页面的综合评分进行看涨跌。</p>
+                            </div>
+                        </div>
+                    </Link>
+
+                    {/* 8. 站点大盘指数 */}
+                    <Link href="/tools/site-index" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-teal-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
+                        <div className="grid grid-cols-[min-content_1fr]">
+                            <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-teal-400 group-hover:text-teal-500 mb-4 mr-4 max-h-14 text-3xl">
+                                <i className="fa-solid fa-globe"></i>
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-2 group-hover:text-teal-400 transition-colors">站点大盘指数</h2>
+                                <p className="text-gray-400 text-sm leading-relaxed">各站繁荣度量化为点数走势，可作为长线 ETF 基金大额认购持有。</p>
+                            </div>
+                        </div>
+                    </Link>
+
+                    {/* 9. 成员管理 (原有) */}
                     <Link href="/tools/member-admin" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-blue-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-blue-400 group-hover:text-blue-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -100,14 +128,12 @@ export default function Tools() {
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-white mb-2 group-hover:text-blue-400 transition-colors">成员管理</h2>
-                                <p className="text-gray-400 text-sm leading-relaxed">
-                                    在特定站点对指定成员采取封禁、移除等操作。
-                                </p>
+                                <p className="text-gray-400 text-sm leading-relaxed">在特定站点对指定成员采取封禁、移除等操作。</p>
                             </div>
                         </div>
                     </Link>
 
-                    {/* 原有功能：删帖公示 */}
+                    {/* 10. 删帖公示 (原有) */}
                     <Link href="/tools/delete-announcement" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-red-400 group-hover:text-red-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -115,9 +141,7 @@ export default function Tools() {
                             </div>
                             <div>
                                 <h2 className="text-xl font-bold text-white mb-2 group-hover:text-red-400 transition-colors">删帖公示</h2>
-                                <p className="text-gray-400 text-sm leading-relaxed">
-                                    查看近期已被删除的页面记录与相关公示信息。
-                                </p>
+                                <p className="text-gray-400 text-sm leading-relaxed">查看近期已被删除的页面记录与相关公示信息。</p>
                             </div>
                         </div>
                     </Link>
