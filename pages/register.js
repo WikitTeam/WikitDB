@@ -1,5 +1,5 @@
 // pages/register.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 
@@ -9,16 +9,15 @@ export default function Register() {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     
-    // 新增：验证相关状态
-    const [step, setStep] = useState(1); // 1: 填账号密码 2: 编辑验证
+    const [step, setStep] = useState(1);
     const [verifyCode, setVerifyCode] = useState('');
     const [isVerifying, setIsVerifying] = useState(false);
     
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
-    // 点击第一步的“下一步”生成验证码
-    const handleNextStep = (e) => {
+    // 第一步：向后端发送 start 动作，生成验证码并存入临时库
+    const handleNextStep = async (e) => {
         e.preventDefault();
         setError('');
         
@@ -31,34 +30,57 @@ export default function Register() {
             return;
         }
 
-        // 生成一个 6 位随机验证码
-        const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-        setVerifyCode(`WIKIT-${code}`);
-        setStep(2);
+        try {
+            const res = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'start', username, password })
+            });
+            const data = await res.json();
+
+            if (!res.ok) {
+                setError(data.error || '无法启动验证流程');
+            } else {
+                setVerifyCode(data.verifyUrl); // 后端返回的是 verifyUrl 字段
+                setStep(2);
+            }
+        } catch (err) {
+            setError('网络错误，请稍后再试');
+        }
     };
 
-    // 点击第二步的“完成验证”
+    // 第二步：向后端发送 check 动作，验证成功后再发送 submit 动作
     const handleVerifyAndRegister = async () => {
         setIsVerifying(true);
         setError('');
         
         try {
-            const res = await fetch('/api/register', {
+            // 1. 发起查记录请求
+            const checkRes = await fetch('/api/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    username, 
-                    password,
-                    verifyCode // 把生成的验证码传给后端查记录
-                })
+                body: JSON.stringify({ action: 'check', username })
             });
+            const checkData = await checkRes.json();
 
-            const data = await res.json();
+            if (!checkRes.ok) {
+                setError(checkData.error || '验证失败，请重试');
+                setIsVerifying(false);
+                return;
+            }
 
-            if (!res.ok) {
-                setError(data.error || '验证失败，请重试');
+            // 2. 查记录成功，发起正式入库请求
+            const submitRes = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'submit', username })
+            });
+            const submitData = await submitRes.json();
+
+            if (!submitRes.ok) {
+                setError(submitData.error || '数据写入失败');
             } else {
-                setSuccess(`验证成功！已绑定 Wikidot 账号：${data.wikidotUser}`);
+                setSuccess(`验证成功！已绑定 Wikidot 账号：${checkData.wdid}`);
                 setTimeout(() => {
                     router.push('/login');
                 }, 2000);
@@ -80,7 +102,7 @@ export default function Register() {
                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-white mb-2">加入控制网</h1>
+                    <h1 className="text-3xl font-bold text-white mb-2">加入Wikit数据库</h1>
                     <p className="text-gray-400 text-sm">注册 WikitDB 档案库</p>
                 </div>
 
@@ -142,7 +164,7 @@ export default function Register() {
                                 <li>复制下方的专属验证码。</li>
                                 <li>前往指定验证页面：<a href="https://wikkit.wikidot.com/wikitdb:verify" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">wikitdb:verify</a></li>
                                 <li>点击该页面底部的 <strong>Edit (编辑)</strong>。</li>
-                                <li>在 <strong>Short description (简短摘要)</strong> 输入框中粘贴您的验证码，不需要修改页面正文内容。</li>
+                                <li>在页面正文随意添加一个空格，然后在 <strong>Short description (简短摘要)</strong> 输入框中粘贴验证码。</li>
                                 <li>点击 <strong>Save (保存)</strong>，然后回到这里点击验证。</li>
                             </ol>
                         </div>
