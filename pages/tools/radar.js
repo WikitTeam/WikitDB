@@ -1,17 +1,13 @@
 // pages/tools/radar.js
 import React, { useState } from 'react';
 import Head from 'next/head';
-import Layout from '../../components/Layout';
 
-// 直接用原生 SVG 绘制雷达图，不引入新的第三方库
 const SvgRadarChart = ({ data }) => {
-    // 固定的六个能力评估维度
     const labels = ['爆肝度', '均分评价', '巅峰实力', '跨域探索', '话题热度', '综合胜率'];
     const size = 320;
     const center = size / 2;
     const radius = 100;
 
-    // 计算背景蜘蛛网的坐标点
     const getPolygonPoints = (scale) => {
         return labels.map((_, i) => {
             const angle = (Math.PI / 3) * i - Math.PI / 2;
@@ -21,7 +17,6 @@ const SvgRadarChart = ({ data }) => {
         }).join(' ');
     };
 
-    // 计算实际数据覆盖区域的顶点
     const dataPoints = data.map((val, i) => {
         const scale = Math.max(0, Math.min(100, val)) / 100;
         const angle = (Math.PI / 3) * i - Math.PI / 2;
@@ -32,7 +27,6 @@ const SvgRadarChart = ({ data }) => {
 
     return (
         <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} className="overflow-visible max-w-sm mx-auto">
-            {/* 绘制五层透明度的背景蜘蛛网 */}
             {[0.2, 0.4, 0.6, 0.8, 1].map(scale => (
                 <polygon 
                     key={scale}
@@ -43,7 +37,6 @@ const SvgRadarChart = ({ data }) => {
                 />
             ))}
 
-            {/* 从中心向外辐射的六条轴线 */}
             {labels.map((_, i) => {
                 const angle = (Math.PI / 3) * i - Math.PI / 2;
                 const x = center + radius * Math.cos(angle);
@@ -53,7 +46,6 @@ const SvgRadarChart = ({ data }) => {
                 );
             })}
 
-            {/* 数据覆盖区域的色块 */}
             <polygon 
                 points={dataPoints} 
                 fill="rgba(59, 130, 246, 0.4)" 
@@ -61,7 +53,6 @@ const SvgRadarChart = ({ data }) => {
                 strokeWidth="2" 
             />
 
-            {/* 突出显示六个数据的顶点 */}
             {data.map((val, i) => {
                 const scale = Math.max(0, Math.min(100, val)) / 100;
                 const angle = (Math.PI / 3) * i - Math.PI / 2;
@@ -70,7 +61,6 @@ const SvgRadarChart = ({ data }) => {
                 return <circle key={`p-${i}`} cx={x} cy={y} r="4" fill="#60a5fa" />;
             })}
 
-            {/* 边缘的六个维度的文字说明 */}
             {labels.map((label, i) => {
                 const angle = (Math.PI / 3) * i - Math.PI / 2;
                 const x = center + (radius + 35) * Math.cos(angle);
@@ -101,7 +91,6 @@ export default function AuthorRadar() {
     const [radarData, setRadarData] = useState([0, 0, 0, 0, 0, 0]);
     const [report, setReport] = useState(null);
 
-    // 向 GraphQL 发起请求获取该作者的所有数据
     const fetchAuthorData = async () => {
         if (!authorName.trim()) return;
         
@@ -155,7 +144,6 @@ export default function AuthorRadar() {
             let totalComments = 0;
             let positiveCount = 0;
 
-            // 统计各项原石数据
             articles.forEach(article => {
                 const rating = article.rating || 0;
                 if (article.wiki) uniqueWikis.add(article.wiki);
@@ -165,14 +153,13 @@ export default function AuthorRadar() {
                 if (rating > 0) positiveCount++;
             });
 
-            // 将统计结果转化为满分 100 的雷达图得分
-            const scoreCount = Math.min(100, (totalArticles / 50) * 100); // 50 篇为满分
+            const scoreCount = Math.min(100, (totalArticles / 50) * 100); 
             const avgRating = totalArticles > 0 ? (totalRating / totalArticles) : 0;
-            const scoreAvg = Math.max(0, Math.min(100, (avgRating / 30) * 100)); // 均分 30 为满分
-            const scorePeak = Math.max(0, Math.min(100, (maxRating / 150) * 100)); // 最高分 150 为满分
-            const scoreCross = Math.min(100, (uniqueWikis.size / 5) * 100); // 跨 5 个站为满分
-            const scoreHot = Math.min(100, (totalComments / 200) * 100); // 评论数 200 为满分
-            const scoreWinRate = totalArticles > 0 ? (positiveCount / totalArticles) * 100 : 0; // 正分率
+            const scoreAvg = Math.max(0, Math.min(100, (avgRating / 30) * 100)); 
+            const scorePeak = Math.max(0, Math.min(100, (maxRating / 150) * 100)); 
+            const scoreCross = Math.min(100, (uniqueWikis.size / 5) * 100); 
+            const scoreHot = Math.min(100, (totalComments / 200) * 100); 
+            const scoreWinRate = totalArticles > 0 ? (positiveCount / totalArticles) * 100 : 0; 
 
             setRadarData([scoreCount, scoreAvg, scorePeak, scoreCross, scoreHot, scoreWinRate]);
             generateReport(totalArticles, uniqueWikis.size, maxRating, scoreWinRate);
@@ -184,7 +171,6 @@ export default function AuthorRadar() {
         }
     };
 
-    // 根据最终的分数动态生成一段评估报告
     const generateReport = (count, wikiCount, maxRating, winRate) => {
         let title = "Safe (安全级)";
         let desc = "该实体在维基系统中的活动相对平稳，未表现出强烈的异常扩张倾向。";
@@ -207,7 +193,7 @@ export default function AuthorRadar() {
     };
 
     return (
-        <Layout>
+        <>
             <Head>
                 <title>创作者战力雷达 - WikitDB</title>
             </Head>
@@ -282,6 +268,6 @@ export default function AuthorRadar() {
                     </div>
                 </div>
             </div>
-        </Layout>
+        </>
     );
 }
