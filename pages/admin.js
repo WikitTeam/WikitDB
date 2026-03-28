@@ -45,10 +45,21 @@ export default function AdminDashboard() {
             'ban': '封禁',
             'unban': '解封',
             'promote': '设为管理',
-            'demote': '取消管理'
+            'demote': '取消管理',
+            'delete': '永久删除' // 新增删除操作名称
         };
 
-        if (!confirm(`确定要对 ${targetUser} 执行 [${actionNames[action]}] 操作吗？`)) return;
+        // 针对删除操作进行额外的双重确认，防止误操作
+        if (action === 'delete') {
+            if (!confirm(`！！！警告！！！\n你正在对用户 ${targetUser} 执行 [永久删除] 操作。\n该操作将清除其所有资产、余额和绑定信息，且【不可逆转】。\n确定要执行吗？`)) {
+                return;
+            }
+            if (!confirm(`请再次确认：真的要彻底删除 ${targetUser} 吗？`)) {
+                return;
+            }
+        } else {
+            if (!confirm(`确定要对 ${targetUser} 执行 [${actionNames[action]}] 操作吗？`)) return;
+        }
 
         try {
             const res = await fetch('/api/admin/users', {
@@ -60,6 +71,9 @@ export default function AdminDashboard() {
             if (res.ok) {
                 // 操作成功后刷新列表
                 fetchUsers();
+                if (action === 'delete') {
+                    alert(`用户 ${targetUser} 的档案已被成功抹除。`);
+                }
             } else {
                 const data = await res.json();
                 alert(data.error || '操作失败');
@@ -90,7 +104,7 @@ export default function AdminDashboard() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0a0a0a] text-gray-200 flex">
+        <div className="min-h-screen bg-[#0a0a0a] text-gray-200 flex overflow-hidden">
             <Head>
                 <title>中央控制台 - WikitDB Admin</title>
             </Head>
@@ -138,22 +152,25 @@ export default function AdminDashboard() {
                 </header>
 
                 <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                    {/* 仪表盘占位 */}
+                    {/* 大盘概览视图 */}
                     {activeTab === 'dashboard' && (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-gray-800/40 p-6 rounded-xl border border-gray-700 shadow-lg">
-                                <div className="text-gray-400 text-sm mb-2">系统总用户数</div>
-                                <div className="text-3xl font-mono font-bold text-white">{users.length || '--'}</div>
+                            <div className="bg-gray-800/40 p-6 rounded-xl border border-gray-700 shadow-lg relative overflow-hidden">
+                                <div className="absolute -right-4 -bottom-4 text-gray-800 text-6xl opacity-30"><i className="fa-solid fa-users"></i></div>
+                                <div className="text-gray-400 text-sm mb-2 relative z-10">系统总用户数</div>
+                                <div className="text-3xl font-mono font-bold text-white relative z-10">{users.length || '--'}</div>
                             </div>
-                            <div className="bg-gray-800/40 p-6 rounded-xl border border-gray-700 shadow-lg">
-                                <div className="text-gray-400 text-sm mb-2">资金池总额 (¥)</div>
-                                <div className="text-3xl font-mono font-bold text-green-400">
+                            <div className="bg-gray-800/40 p-6 rounded-xl border border-gray-700 shadow-lg relative overflow-hidden">
+                                <div className="absolute -right-4 -bottom-4 text-gray-800 text-6xl opacity-30"><i className="fa-solid fa-sack-dollar"></i></div>
+                                <div className="text-gray-400 text-sm mb-2 relative z-10">资金池总额 (¥)</div>
+                                <div className="text-3xl font-mono font-bold text-green-400 relative z-10">
                                     {users.reduce((sum, u) => sum + (Number(u.balance) || 0), 0).toLocaleString()}
                                 </div>
                             </div>
-                            <div className="bg-gray-800/40 p-6 rounded-xl border border-gray-700 shadow-lg">
-                                <div className="text-gray-400 text-sm mb-2">系统状态</div>
-                                <div className="text-xl font-bold text-cyan-400 flex items-center gap-2 mt-2">
+                            <div className="bg-gray-800/40 p-6 rounded-xl border border-gray-700 shadow-lg relative overflow-hidden">
+                                <div className="absolute -right-4 -bottom-4 text-cyan-900 text-6xl opacity-30"><i className="fa-solid fa-heart-pulse"></i></div>
+                                <div className="text-gray-400 text-sm mb-2 relative z-10">系统状态</div>
+                                <div className="text-xl font-bold text-cyan-400 flex items-center gap-2 mt-2 relative z-10">
                                     <div className="w-3 h-3 rounded-full bg-cyan-500 animate-pulse"></div>
                                     运行良好
                                 </div>
@@ -184,7 +201,7 @@ export default function AdminDashboard() {
 
                             {/* 数据表格 */}
                             <div className="bg-gray-800/40 rounded-xl border border-gray-700 overflow-hidden shadow-xl flex-1 flex flex-col">
-                                <div className="overflow-x-auto flex-1">
+                                <div className="overflow-x-auto flex-1 custom-scrollbar">
                                     <table className="w-full text-left text-sm whitespace-nowrap">
                                         <thead className="bg-gray-900/80 text-gray-400 sticky top-0 z-10">
                                             <tr>
@@ -193,7 +210,7 @@ export default function AdminDashboard() {
                                                 <th className="px-6 py-4 font-medium border-b border-gray-700">账户余额</th>
                                                 <th className="px-6 py-4 font-medium border-b border-gray-700">身份组</th>
                                                 <th className="px-6 py-4 font-medium border-b border-gray-700">状态</th>
-                                                <th className="px-6 py-4 font-medium border-b border-gray-700 text-right">操作</th>
+                                                <th className="px-6 py-4 font-medium border-b border-gray-700 text-right">管理操作</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-800">
@@ -201,7 +218,7 @@ export default function AdminDashboard() {
                                                 <tr>
                                                     <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                                                         <i className="fa-solid fa-circle-notch animate-spin text-xl mb-2 block"></i>
-                                                        正在读取数据库...
+                                                        正在读取 Redis 数据库...
                                                     </td>
                                                 </tr>
                                             ) : filteredUsers.length === 0 ? (
@@ -211,7 +228,12 @@ export default function AdminDashboard() {
                                             ) : (
                                                 filteredUsers.map((u, idx) => (
                                                     <tr key={idx} className="hover:bg-gray-800/60 transition-colors">
-                                                        <td className="px-6 py-4 font-bold text-white">{u.username}</td>
+                                                        <td className="px-6 py-4 font-bold text-white flex items-center gap-3">
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${idx % 3 === 0 ? 'bg-blue-900 text-blue-300' : idx % 3 === 1 ? 'bg-purple-900 text-purple-300' : 'bg-gray-700 text-gray-300'}`}>
+                                                                {u.username.substring(0, 1).toUpperCase()}
+                                                            </div>
+                                                            {u.username}
+                                                        </td>
                                                         <td className="px-6 py-4 text-blue-400 font-mono">{u.wikidotAccount || '未绑定'}</td>
                                                         <td className="px-6 py-4 font-mono text-green-400">¥{(Number(u.balance) || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                                                         <td className="px-6 py-4">
@@ -228,26 +250,36 @@ export default function AdminDashboard() {
                                                                 <span className="text-green-400 flex items-center gap-1"><i className="fa-solid fa-check text-xs"></i> 正常</span>
                                                             )}
                                                         </td>
-                                                        <td className="px-6 py-4 text-right space-x-2">
+                                                        <td className="px-6 py-4 text-right space-x-1.5">
+                                                            {/* 功能性按钮 (封禁、提权) */}
                                                             {u.status === 'banned' ? (
-                                                                <button onClick={() => handleUserAction(u.username, 'unban')} className="p-2 bg-gray-700 hover:bg-green-600 text-gray-300 hover:text-white rounded transition-colors" title="解除封禁">
+                                                                <button onClick={() => handleUserAction(u.username, 'unban')} className="w-9 h-9 flex items-center justify-center inline-flex bg-gray-700 hover:bg-green-600 text-gray-300 hover:text-white rounded-lg transition-colors" title="解除封禁">
                                                                     <i className="fa-solid fa-unlock"></i>
                                                                 </button>
                                                             ) : (
-                                                                <button onClick={() => handleUserAction(u.username, 'ban')} className="p-2 bg-gray-700 hover:bg-red-600 text-gray-300 hover:text-white rounded transition-colors" title="封禁用户">
+                                                                <button onClick={() => handleUserAction(u.username, 'ban')} className="w-9 h-9 flex items-center justify-center inline-flex bg-gray-700 hover:bg-yellow-600 text-gray-300 hover:text-white rounded-lg transition-colors" title="封禁用户">
                                                                     <i className="fa-solid fa-ban"></i>
                                                                 </button>
                                                             )}
 
                                                             {u.role === 'admin' ? (
-                                                                <button onClick={() => handleUserAction(u.username, 'demote')} className="p-2 bg-gray-700 hover:bg-orange-600 text-gray-300 hover:text-white rounded transition-colors" title="降级为普通成员">
+                                                                <button onClick={() => handleUserAction(u.username, 'demote')} className="w-9 h-9 flex items-center justify-center inline-flex bg-gray-700 hover:bg-orange-600 text-gray-300 hover:text-white rounded-lg transition-colors" title="降级为普通成员">
                                                                     <i className="fa-solid fa-user-minus"></i>
                                                                 </button>
                                                             ) : (
-                                                                <button onClick={() => handleUserAction(u.username, 'promote')} className="p-2 bg-gray-700 hover:bg-purple-600 text-gray-300 hover:text-white rounded transition-colors" title="提升为管理员">
+                                                                <button onClick={() => handleUserAction(u.username, 'promote')} className="w-9 h-9 flex items-center justify-center inline-flex bg-gray-700 hover:bg-purple-600 text-gray-300 hover:text-white rounded-lg transition-colors" title="提升为管理员">
                                                                     <i className="fa-solid fa-user-shield"></i>
                                                                 </button>
                                                             )}
+
+                                                            {/* 没收/删除操作 - 使用红色样式 */}
+                                                            <button 
+                                                                onClick={() => handleUserAction(u.username, 'delete')} 
+                                                                className="w-9 h-9 flex items-center justify-center inline-flex bg-red-900/30 hover:bg-red-600 text-red-400 hover:text-white rounded-lg border border-red-800/50 transition-colors" 
+                                                                title="永久删除/没收该用户 (不可逆)"
+                                                            >
+                                                                <i className="fa-solid fa-trash-can"></i>
+                                                            </button>
                                                         </td>
                                                     </tr>
                                                 ))
@@ -255,9 +287,9 @@ export default function AdminDashboard() {
                                         </tbody>
                                     </table>
                                 </div>
-                                <div className="bg-gray-900/80 px-6 py-3 border-t border-gray-700 text-xs text-gray-500 flex justify-between items-center">
-                                    <span>显示 {filteredUsers.length} 条记录</span>
-                                    <span>系统底层直接读取 Redis 键值</span>
+                                <div className="bg-gray-900/80 px-6 py-3 border-t border-gray-700 text-xs text-gray-500 flex justify-between items-center shrink-0">
+                                    <span>显示 {filteredUsers.length} 条记录 / 共 {users.length} 名成员</span>
+                                    <span>宏观干预终端 v2.0 | 系统底层直接读取 Redis 键值</span>
                                 </div>
                             </div>
                         </div>
@@ -265,9 +297,10 @@ export default function AdminDashboard() {
 
                     {/* 系统设置占位 */}
                     {activeTab === 'settings' && (
-                        <div className="bg-gray-800/40 p-8 rounded-xl border border-gray-700">
-                            <h3 className="text-xl font-bold text-white mb-4">系统全局设定</h3>
-                            <p className="text-gray-400">设置模块正在建设中，未来将支持在此处调整经济系统汇率及大盘基准点数。</p>
+                        <div className="bg-gray-800/40 p-8 rounded-xl border border-gray-700 shadow-lg relative overflow-hidden">
+                            <div className="absolute -right-4 -bottom-4 text-cyan-900 text-8xl opacity-10"><i className="fa-solid fa-gears"></i></div>
+                            <h3 className="text-xl font-bold text-white mb-4 relative z-10">系统全局设定 (Beta)</h3>
+                            <p className="text-gray-400 relative z-10">设置模块正在建设中，未来将支持在此处直接修改系统广播、印钞汇率及大盘基准点数。</p>
                         </div>
                     )}
 
