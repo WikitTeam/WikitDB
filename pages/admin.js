@@ -1,12 +1,12 @@
 // pages/admin.js
 import React, { useState, useEffect } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('members');
     const [currentUser, setCurrentUser] = useState(null);
     
-    // 各模块状态
     const [users, setUsers] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -31,7 +31,6 @@ export default function AdminDashboard() {
         if (activeTab === 'broadcast') fetchBroadcast();
     }, [activeTab]);
 
-    // 成员管理逻辑
     const fetchUsers = async () => {
         setIsLoading(true);
         try {
@@ -78,7 +77,6 @@ export default function AdminDashboard() {
         }
     };
 
-    // 审计日志逻辑
     const fetchLogs = async () => {
         try {
             const res = await fetch('/api/admin/logs');
@@ -88,7 +86,6 @@ export default function AdminDashboard() {
         }
     };
 
-    // 广播逻辑
     const fetchBroadcast = async () => {
         try {
             const res = await fetch('/api/admin/broadcast');
@@ -111,7 +108,6 @@ export default function AdminDashboard() {
         }
     };
 
-    // 宏观调控逻辑
     const executeMacro = async (action) => {
         if (!confirm(`警告：该操作将影响全站所有用户，确定执行吗？`)) return;
         try {
@@ -129,7 +125,6 @@ export default function AdminDashboard() {
         }
     };
 
-    // Redis控制台逻辑
     const queryRedis = async (action) => {
         if (!redisKey) return alert('请输入键名');
         try {
@@ -153,9 +148,11 @@ export default function AdminDashboard() {
 
     const filteredUsers = users.filter(u => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
 
+    // 导航栏增加工具箱入口
     const navItems = [
         { id: 'members', label: '成员管理', icon: 'fa-users' },
         { id: 'logs', label: '交易审计', icon: 'fa-list-check' },
+        { id: 'tools', label: '应用工具箱', icon: 'fa-toolbox' },
         { id: 'broadcast', label: '全站广播', icon: 'fa-bullhorn' },
         { id: 'macro', label: '宏观经济', icon: 'fa-money-bill-trend-up' },
         { id: 'redis', label: '裸键终端', icon: 'fa-terminal' }
@@ -171,7 +168,6 @@ export default function AdminDashboard() {
         <div className="min-h-screen bg-slate-50 text-gray-800 flex overflow-hidden font-sans">
             <Head><title>中央控制台 - WikitDB</title></Head>
 
-            {/* 侧边栏 */}
             <aside className="w-64 bg-white border-r border-gray-200 flex flex-col shrink-0 shadow-sm z-10">
                 <div className="h-16 flex items-center px-6 border-b border-gray-100">
                     <h1 className="text-xl font-bold text-blue-600 tracking-tight flex items-center gap-2">
@@ -217,7 +213,6 @@ export default function AdminDashboard() {
                 </div>
             </aside>
 
-            {/* 主内容区 */}
             <main className="flex-1 flex flex-col h-screen overflow-hidden">
                 <header className="h-16 bg-white border-b border-gray-200 flex items-center px-8 shrink-0 justify-between">
                     <h2 className="text-lg font-bold text-gray-800">
@@ -231,10 +226,129 @@ export default function AdminDashboard() {
 
                 <div className="flex-1 overflow-y-auto p-8">
                     
-                    {/* 模块1：成员管理 */}
+                    {/* 工具箱模块整合 */}
+                    {activeTab === 'tools' && (
+                        <div className="max-w-7xl mx-auto w-full">
+                            <div className="mb-6 border-b border-gray-200 pb-4">
+                                <h3 className="text-xl font-bold text-gray-800">实验性应用与扩展</h3>
+                                <p className="text-gray-500 text-sm mt-1">WikitDB 系统的各项扩展功能模块集合。</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <Link href="/tools/gacha" className="bg-white p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all group flex flex-col justify-between cursor-pointer">
+                                    <div className="grid grid-cols-[min-content_1fr]">
+                                        <div className="rounded-xl bg-purple-50 p-[10px_8px] text-purple-500 mb-4 mr-4 max-h-14 text-3xl flex items-center justify-center w-14">
+                                            <i className="fa-solid fa-box-open"></i>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-purple-600 transition-colors">档案馆盲盒</h2>
+                                            <p className="text-gray-500 text-xs leading-relaxed">消耗资产，在浩瀚的数据中随机抽取未知的页面标的进行投资。</p>
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/tools/author-stock" className="bg-white p-6 rounded-xl border border-gray-200 hover:border-green-300 hover:shadow-md transition-all group flex flex-col justify-between cursor-pointer">
+                                    <div className="grid grid-cols-[min-content_1fr]">
+                                        <div className="rounded-xl bg-green-50 p-[10px_8px] text-green-500 mb-4 mr-4 max-h-14 text-3xl flex items-center justify-center w-14">
+                                            <i className="fa-solid fa-chart-line"></i>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-green-600 transition-colors">作者概念股</h2>
+                                            <p className="text-gray-500 text-xs leading-relaxed">投资有潜力的创作者，股价走势与近期发文量、存活率深度挂钩。</p>
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/tools/quality-judge" className="bg-white p-6 rounded-xl border border-gray-200 hover:border-cyan-300 hover:shadow-md transition-all group flex flex-col justify-between cursor-pointer">
+                                    <div className="grid grid-cols-[min-content_1fr]">
+                                        <div className="rounded-xl bg-cyan-50 p-[10px_8px] text-cyan-500 mb-4 mr-4 max-h-14 text-3xl flex items-center justify-center w-14">
+                                            <i className="fa-solid fa-scale-balanced"></i>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-cyan-600 transition-colors">页面打新评断</h2>
+                                            <p className="text-gray-500 text-xs leading-relaxed">获取近期最新发布的页面，在信息流中快速做多或做空未来的评分。</p>
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/tools/radar" className="bg-white p-6 rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all group flex flex-col justify-between cursor-pointer">
+                                    <div className="grid grid-cols-[min-content_1fr]">
+                                        <div className="rounded-xl bg-indigo-50 p-[10px_8px] text-indigo-500 mb-4 mr-4 max-h-14 text-3xl flex items-center justify-center w-14">
+                                            <i className="fa-solid fa-crosshairs"></i>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-indigo-600 transition-colors">战力雷达评估</h2>
+                                            <p className="text-gray-500 text-xs leading-relaxed">跨站聚合创作者的历史档案，多维度生成雷达图并推算其危险等级。</p>
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/tools/escape" className="bg-white p-6 rounded-xl border border-gray-200 hover:border-orange-300 hover:shadow-md transition-all group flex flex-col justify-between cursor-pointer">
+                                    <div className="grid grid-cols-[min-content_1fr]">
+                                        <div className="rounded-xl bg-orange-50 p-[10px_8px] text-orange-500 mb-4 mr-4 max-h-14 text-3xl flex items-center justify-center w-14">
+                                            <i className="fa-solid fa-triangle-exclamation"></i>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-orange-600 transition-colors">代码修复逃脱</h2>
+                                            <p className="text-gray-500 text-xs leading-relaxed">随机抽取受损的真实页面源码，限时修复排版语法以阻止收容失效。</p>
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/tools/splice" className="bg-white p-6 rounded-xl border border-gray-200 hover:border-pink-300 hover:shadow-md transition-all group flex flex-col justify-between cursor-pointer">
+                                    <div className="grid grid-cols-[min-content_1fr]">
+                                        <div className="rounded-xl bg-pink-50 p-[10px_8px] text-pink-500 mb-4 mr-4 max-h-14 text-3xl flex items-center justify-center w-14">
+                                            <i className="fa-solid fa-puzzle-piece"></i>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-pink-600 transition-colors">跨界缝合怪</h2>
+                                            <p className="text-gray-500 text-xs leading-relaxed">抽取多站点的无关联文本碎片，由你来拼接命名属于你的荒诞故事。</p>
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/tools/tag-futures" className="bg-white p-6 rounded-xl border border-gray-200 hover:border-yellow-400 hover:shadow-md transition-all group flex flex-col justify-between cursor-pointer">
+                                    <div className="grid grid-cols-[min-content_1fr]">
+                                        <div className="rounded-xl bg-yellow-50 p-[10px_8px] text-yellow-500 mb-4 mr-4 max-h-14 text-3xl flex items-center justify-center w-14">
+                                            <i className="fa-solid fa-tags"></i>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-yellow-600 transition-colors">标签大宗商品</h2>
+                                            <p className="text-gray-500 text-xs leading-relaxed">将常见分类标签视作商品，根据近期该标签页面的综合评分进行看涨跌。</p>
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/tools/site-index" className="bg-white p-6 rounded-xl border border-gray-200 hover:border-teal-300 hover:shadow-md transition-all group flex flex-col justify-between cursor-pointer">
+                                    <div className="grid grid-cols-[min-content_1fr]">
+                                        <div className="rounded-xl bg-teal-50 p-[10px_8px] text-teal-500 mb-4 mr-4 max-h-14 text-3xl flex items-center justify-center w-14">
+                                            <i className="fa-solid fa-globe"></i>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-teal-600 transition-colors">站点大盘指数</h2>
+                                            <p className="text-gray-500 text-xs leading-relaxed">各站繁荣度量化为点数走势，可作为长线 ETF 基金大额认购持有。</p>
+                                        </div>
+                                    </div>
+                                </Link>
+
+                                <Link href="/tools/delete-announcement" className="bg-white p-6 rounded-xl border border-gray-200 hover:border-red-300 hover:shadow-md transition-all group flex flex-col justify-between cursor-pointer">
+                                    <div className="grid grid-cols-[min-content_1fr]">
+                                        <div className="rounded-xl bg-red-50 p-[10px_8px] text-red-500 mb-4 mr-4 max-h-14 text-3xl flex items-center justify-center w-14">
+                                            <i className="fa-solid fa-trash-can"></i>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-gray-900 mb-1 group-hover:text-red-600 transition-colors">删帖公示</h2>
+                                            <p className="text-gray-500 text-xs leading-relaxed">查看近期已被删除的页面记录与相关公示信息。</p>
+                                        </div>
+                                    </div>
+                                </Link>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 其他原有模块 */}
                     {activeTab === 'members' && (
                         <div className="flex flex-col gap-6 h-full max-w-7xl mx-auto">
-                            {/* 顶部操作栏 */}
                             <div className="flex justify-between items-center">
                                 <div className="relative w-80">
                                     <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
@@ -252,7 +366,6 @@ export default function AdminDashboard() {
                                 </button>
                             </div>
 
-                            {/* 表格卡片 */}
                             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm flex-1 flex flex-col">
                                 <div className="overflow-x-auto flex-1">
                                     <table className="min-w-full text-left text-sm whitespace-nowrap">
@@ -313,7 +426,6 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
                             
-                            {/* 透视面板 */}
                             {inspectData && (
                                 <div className="bg-white p-6 border border-gray-200 rounded-xl shadow-sm">
                                     <div className="font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -326,7 +438,6 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
-                    {/* 模块2：审计天眼 */}
                     {activeTab === 'logs' && (
                         <div className="max-w-5xl mx-auto bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
@@ -350,7 +461,6 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
-                    {/* 模块3：全局广播 */}
                     {activeTab === 'broadcast' && (
                         <div className="max-w-2xl mx-auto bg-white border border-gray-200 p-8 rounded-xl shadow-sm space-y-6">
                             <div>
@@ -370,7 +480,6 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
-                    {/* 模块4：宏观调控 */}
                     {activeTab === 'macro' && (
                         <div className="max-w-3xl mx-auto space-y-6">
                             <div className="bg-white border border-gray-200 p-8 rounded-xl shadow-sm flex flex-col md:flex-row gap-8 items-start">
@@ -406,7 +515,6 @@ export default function AdminDashboard() {
                         </div>
                     )}
 
-                    {/* 模块5：裸键终端 */}
                     {activeTab === 'redis' && (
                         <div className="max-w-4xl mx-auto bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                             <div className="bg-gray-900 px-6 py-3 flex items-center gap-3">
