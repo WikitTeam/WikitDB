@@ -1,4 +1,3 @@
-// pages/api/admin/settings.js
 import { Redis } from '@upstash/redis';
 
 const redis = Redis.fromEnv();
@@ -9,9 +8,9 @@ export default async function handler(req, res) {
     const { module, data } = req.body;
     
     try {
-        // 保存大乐透玩法的配置
-        if (module === 'bingo') {
-            await redis.set('config:bingo', JSON.stringify(data));
+        // 支持保存 bingo 和 bounty 玩法的配置
+        if (module === 'bingo' || module === 'bounty') {
+            await redis.set(`config:${module}`, JSON.stringify(data));
             return res.status(200).json({ success: true });
         }
         
