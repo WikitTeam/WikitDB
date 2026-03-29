@@ -1,3 +1,4 @@
+// pages/tools.js
 import React from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
@@ -42,7 +43,33 @@ export default function Tools() {
                         </div>
                     </Link>
 
-                    {/* 3. 页面打新评断 */}
+                    {/* 3. 标签大乐透 */}
+                    <Link href="/tools/bingo" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-teal-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
+                        <div className="grid grid-cols-[min-content_1fr]">
+                            <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-teal-400 group-hover:text-teal-500 mb-4 mr-4 max-h-14 text-3xl">
+                                <i className="fa-solid fa-ticket-simple"></i>
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-2 group-hover:text-teal-400 transition-colors">标签大乐透</h2>
+                                <p className="text-gray-400 text-sm leading-relaxed">消耗扫描凭证，命中特定标签即可赢取最高百倍赔率的奖金。</p>
+                            </div>
+                        </div>
+                    </Link>
+
+                    {/* 4. 全站公共彩票池 */}
+                    <Link href="/tools/jackpot" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-yellow-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
+                        <div className="grid grid-cols-[min-content_1fr]">
+                            <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-yellow-400 group-hover:text-yellow-500 mb-4 mr-4 max-h-14 text-3xl">
+                                <i className="fa-solid fa-sack-dollar"></i>
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-2 group-hover:text-yellow-400 transition-colors">全站公共彩票池</h2>
+                                <p className="text-gray-400 text-sm leading-relaxed">全站玩家共同注资的公共奖池，每日随机开奖，瓜分巨额奖金。</p>
+                            </div>
+                        </div>
+                    </Link>
+
+                    {/* 5. 页面打新评断 */}
                     <Link href="/tools/quality-judge" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-cyan-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-cyan-400 group-hover:text-cyan-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -55,7 +82,33 @@ export default function Tools() {
                         </div>
                     </Link>
 
-                    {/* 4. 战力雷达评估 */}
+                    {/* 6. 收容物斗兽场 */}
+                    <Link href="/tools/deathmatch" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
+                        <div className="grid grid-cols-[min-content_1fr]">
+                            <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-red-400 group-hover:text-red-500 mb-4 mr-4 max-h-14 text-3xl">
+                                <i className="fa-solid fa-skull-crossbones"></i>
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-2 group-hover:text-red-400 transition-colors">收容物斗兽场</h2>
+                                <p className="text-gray-400 text-sm leading-relaxed">押注两篇随机提取的异常档案，盲猜真实评分高低，赢取双倍返还。</p>
+                            </div>
+                        </div>
+                    </Link>
+
+                    {/* 7. 异常档案悬赏令 */}
+                    <Link href="/tools/bounty" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-orange-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
+                        <div className="grid grid-cols-[min-content_1fr]">
+                            <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-orange-400 group-hover:text-orange-500 mb-4 mr-4 max-h-14 text-3xl">
+                                <i className="fa-solid fa-scroll"></i>
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white mb-2 group-hover:text-orange-400 transition-colors">异常档案悬赏令</h2>
+                                <p className="text-gray-400 text-sm leading-relaxed">全服寻宝任务，寻找符合特定标签与评分组合档案拿走高额赏金。</p>
+                            </div>
+                        </div>
+                    </Link>
+
+                    {/* 8. 战力雷达评估 */}
                     <Link href="/tools/radar" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-indigo-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-indigo-400 group-hover:text-indigo-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -68,7 +121,7 @@ export default function Tools() {
                         </div>
                     </Link>
 
-                    {/* 5. 代码修复逃脱 */}
+                    {/* 9. 代码修复逃脱 */}
                     <Link href="/tools/escape" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-orange-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-orange-400 group-hover:text-orange-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -81,7 +134,7 @@ export default function Tools() {
                         </div>
                     </Link>
 
-                    {/* 6. 跨界缝合怪 */}
+                    {/* 10. 跨界缝合怪 */}
                     <Link href="/tools/splice" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-pink-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-pink-400 group-hover:text-pink-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -94,7 +147,7 @@ export default function Tools() {
                         </div>
                     </Link>
 
-                    {/* 7. 标签大宗商品 */}
+                    {/* 11. 标签大宗商品 */}
                     <Link href="/tools/tag-futures" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-yellow-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-yellow-400 group-hover:text-yellow-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -107,7 +160,7 @@ export default function Tools() {
                         </div>
                     </Link>
 
-                    {/* 8. 站点大盘指数 */}
+                    {/* 12. 站点大盘指数 */}
                     <Link href="/tools/site-index" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-teal-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-teal-400 group-hover:text-teal-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -120,7 +173,7 @@ export default function Tools() {
                         </div>
                     </Link>
 
-                    {/* 9. 成员管理 (原有) */}
+                    {/* 13. 成员管理 (原有) */}
                     <Link href="/tools/member-admin" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-blue-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-blue-400 group-hover:text-blue-500 mb-4 mr-4 max-h-14 text-3xl">
@@ -133,7 +186,7 @@ export default function Tools() {
                         </div>
                     </Link>
 
-                    {/* 10. 删帖公示 (原有) */}
+                    {/* 14. 删帖公示 (原有) */}
                     <Link href="/tools/delete-announcement" className="bg-gray-800/50 p-6 rounded-xl border border-gray-700 hover:border-red-500 hover:bg-gray-800 transition-all group flex flex-col justify-between shadow-lg">
                         <div className="grid grid-cols-[min-content_1fr]">
                             <div className="rounded-xl bg-[#24344f] p-[10px_8px] text-red-400 group-hover:text-red-500 mb-4 mr-4 max-h-14 text-3xl">
