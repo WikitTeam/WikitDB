@@ -2,9 +2,13 @@ import { Redis } from '@upstash/redis';
 
 const redis = Redis.fromEnv();
 
-// 生成随机悬赏任务的辅助函数
-const generateBounties = () => {
-    const tagPool = ['原创', '精品', 'scp', 'tale', 'goi-format', '微恐', '搞笑', '科幻', 'keter', '安全'];
+// 生成随机悬赏任务的辅助函数（接收后台动态配置）
+const generateBounties = (config) => {
+    const tagPool = config?.tags?.length > 0 ? config.tags : ['原创', '精品', 'scp', 'tale', 'goi-format', '微恐', '搞笑', '科幻', 'keter', '安全'];
+    const minR = config?.minRating ?? 10;
+    const maxR = config?.maxRating ?? 50;
+    const baseReward = config?.baseReward ?? 800;
+
     const bounties = [];
     for (let i = 0; i < 3; i++) {
         // 随机抽取 1 到 2 个标签作为要求
@@ -13,13 +17,15 @@ const generateBounties = () => {
             tags.push(tagPool[Math.floor(Math.random() * tagPool.length)]);
         }
         const uniqueTags = [...new Set(tags)];
-        const minRating = Math.floor(Math.random() * 40) + 10; 
+        
+        // 在后台设定的下限和上限之间生成要求评分
+        const reqMinRating = Math.floor(Math.random() * (maxR - minR + 1)) + minR; 
         
         bounties.push({
             id: `bounty_${Date.now()}_${i}`,
             tags: uniqueTags,
-            minRating: minRating,
-            reward: (uniqueTags.length * 800) + (minRating * 20),
+            minRating: reqMinRating,
+            reward: (uniqueTags.length * baseReward) + (reqMinRating * 20),
             status: 'active',
             claimer: null,
             claimedPage: null
@@ -30,11 +36,25 @@ const generateBounties = () => {
 
 export default async function handler(req, res) {
     if (req.method === 'GET') {
+        // 后台请求获取当前配置
+        if (req.query.action === 'config') {
+            try {
+                let config = await redis.get('config:bounty');
+                if (typeof config === 'string') config = JSON.parse(config);
+                if (!config) config = { tags: ['原创', '精品', 'scp', 'tale', 'goi-format', '微恐', '搞笑', '科幻', 'keter', '安全'], minRating: 10, maxRating: 50, baseReward: 800 };
+                return res.status(200).json(config);
+            } catch (e) {
+                return res.status(500).json({ error: '配置读取失败' });
+            }
+        }
+
+        // 前端请求悬赏列表
         try {
             let bounties = await redis.get('bounties_list');
-            // 如果缓存里没有悬赏，或者悬赏被清空了，就生成一批新的
             if (!bounties) {
-                bounties = generateBounties();
+                let config = await redis.get('config:bounty');
+                if (typeof config === 'string') config = JSON.parse(config);
+                bounties = generateBounties(config);
                 await redis.set('bounties_list', JSON.stringify(bounties));
             } else if (typeof bounties === 'string') {
                 bounties = JSON.parse(bounties);
@@ -48,9 +68,10 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
         const { action, username, bountyId, wiki, page } = req.body;
 
-        // 提供一个刷新悬赏池的底层指令
         if (action === 'refresh') {
-            const newBounties = generateBounties();
+            let config = await redis.get('config:bounty');
+            if (typeof config === 'string') config = JSON.parse(config);
+            const newBounties = generateBounties(config);
             await redis.set('bounties_list', JSON.stringify(newBounties));
             return res.status(200).json({ success: true, bounties: newBounties });
         }
@@ -77,7 +98,6 @@ export default async function handler(req, res) {
                 return res.status(400).json({ error: '这笔悬赏已经被其他特工领走了' });
             }
 
-            // 去 GraphQL 验证玩家提交的页面
             const query = {
                 query: `query { article(wiki: "${wiki}", page: "${page}") { title rating tags author } }`
             };
@@ -96,7 +116,6 @@ export default async function handler(req, res) {
             const articleTags = article.tags || [];
             const articleRating = article.rating || 0;
 
-            // 核心逻辑：比对标签和评分是否达标
             const hasAllTags = bounty.tags.every(t => articleTags.includes(t));
             const meetsRating = articleRating >= bounty.minRating;
 
@@ -106,7 +125,6 @@ export default async function handler(req, res) {
                 });
             }
 
-            // 验证通过，发放赏金并更新任务状态
             user.balance = (user.balance || 0) + bounty.reward;
             await redis.set(userKey, JSON.stringify(user));
 
